@@ -13,11 +13,38 @@ pub struct MediaResult {
 impl MediaResult {
     /// Format for inclusion in an LLM prompt.
     pub fn to_prompt_context(&self) -> String {
-        let np = self.now_playing.as_deref().unwrap_or("(nothing)");
-        format!(
-            "{}. State: {}. Now playing: {}.",
-            self.summary, self.state, np
-        )
+        match &self.now_playing {
+            Some(np) => format!("{}. {}. Now playing: {}.", self.summary, self.state, np),
+            None => format!("{}. {}.", self.summary, self.state),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MediaResult;
+
+    #[test]
+    fn test_to_prompt_context_with_now_playing() {
+        let result = MediaResult {
+            summary: "Success".to_string(),
+            now_playing: Some("Song".to_string()),
+            state: "playing".to_string(),
+        };
+        assert_eq!(
+            result.to_prompt_context(),
+            "Success. playing. Now playing: Song."
+        );
+    }
+
+    #[test]
+    fn test_to_prompt_context_without_now_playing() {
+        let result = MediaResult {
+            summary: "Paused".to_string(),
+            now_playing: None,
+            state: "paused".to_string(),
+        };
+        assert_eq!(result.to_prompt_context(), "Paused. paused.");
     }
 }
 

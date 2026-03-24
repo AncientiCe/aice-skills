@@ -97,77 +97,98 @@ impl MacOsMusicSkill {
                 })
             }
             "pause" => {
-                if !self.dry_run {
+                let (state, now_playing) = if !self.dry_run {
                     self.run_music_script("tell application \"Music\" to pause")?;
-                }
+                    self.read_status()?
+                } else {
+                    ("paused".to_string(), None)
+                };
                 Ok(MediaResult {
                     summary: "Paused Music.app".to_string(),
-                    now_playing: None,
-                    state: "paused".to_string(),
+                    now_playing,
+                    state,
                 })
             }
             "stop" => {
-                if !self.dry_run {
+                let (state, now_playing) = if !self.dry_run {
                     self.run_music_script("tell application \"Music\" to stop")?;
-                }
+                    self.read_status()?
+                } else {
+                    ("stopped".to_string(), None)
+                };
                 Ok(MediaResult {
                     summary: "Playback stopped".to_string(),
-                    now_playing: None,
-                    state: "stopped".to_string(),
+                    now_playing,
+                    state,
                 })
             }
             "resume" => {
-                if !self.dry_run {
+                let (state, now_playing) = if !self.dry_run {
                     self.run_music_script("tell application \"Music\" to play")?;
-                }
+                    self.read_status()?
+                } else {
+                    ("playing".to_string(), None)
+                };
                 Ok(MediaResult {
                     summary: "Playback resumed".to_string(),
-                    now_playing: None,
-                    state: "playing".to_string(),
+                    now_playing,
+                    state,
                 })
             }
             "next" => {
-                if !self.dry_run {
+                let (state, now_playing) = if !self.dry_run {
                     self.run_music_script("tell application \"Music\" to next track")?;
-                }
+                    self.read_status()?
+                } else {
+                    ("playing".to_string(), None)
+                };
                 Ok(MediaResult {
                     summary: "Skipped to next track".to_string(),
-                    now_playing: None,
-                    state: "playing".to_string(),
+                    now_playing,
+                    state,
                 })
             }
             "previous" => {
-                if !self.dry_run {
+                let (state, now_playing) = if !self.dry_run {
                     self.run_music_script("tell application \"Music\" to previous track")?;
-                }
+                    self.read_status()?
+                } else {
+                    ("playing".to_string(), None)
+                };
                 Ok(MediaResult {
                     summary: "Went to previous track".to_string(),
-                    now_playing: None,
-                    state: "playing".to_string(),
+                    now_playing,
+                    state,
                 })
             }
             "shuffle_on" => {
-                if !self.dry_run {
+                let (state, now_playing) = if !self.dry_run {
                     self.run_music_script(
                         "tell application \"Music\" to set shuffle enabled to true",
                     )?;
-                }
+                    self.read_status()?
+                } else {
+                    ("playing".to_string(), None)
+                };
                 Ok(MediaResult {
                     summary: "Shuffle enabled".to_string(),
-                    now_playing: None,
-                    state: "playing".to_string(),
+                    now_playing,
+                    state,
                 })
             }
             "shuffle_off" => {
-                if !self.dry_run {
+                let (state, now_playing) = if !self.dry_run {
                     self.run_music_script(
                         "tell application \"Music\" to set shuffle enabled to false",
                     )?;
-                }
+                    self.read_status()?
+                } else {
+                    ("playing".to_string(), None)
+                };
                 Ok(MediaResult {
                     summary: "Shuffle disabled".to_string(),
-                    now_playing: None,
-                    state: "playing".to_string(),
+                    now_playing,
+                    state,
                 })
             }
             "status" => {
@@ -228,7 +249,7 @@ impl MacOsMusicSkill {
     }
 
     fn read_status(&self) -> Result<(String, Option<String>), MediaSkillError> {
-        let script = "tell application \"Music\"\nset st to (player state as text)\nif st is \"playing\" or st is \"paused\" then\nset tname to name of current track\nset aname to artist of current track\nreturn st & \"|\" & tname & \"|\" & aname\nend if\nreturn st & \"||\"\nend tell";
+        let script = "tell application \"Music\"\nset s to (player state as text)\nif s is \"playing\" or s is \"paused\" then\nset tname to name of current track\nset aname to artist of current track\nreturn s & \"|\" & tname & \"|\" & aname\nend if\nreturn s & \"||\"\nend tell";
         let out = self.run_music_script(script)?;
         let mut parts = out.splitn(3, '|');
         let state = parts.next().unwrap_or("unknown").trim().to_string();
