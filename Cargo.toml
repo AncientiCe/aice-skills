@@ -9,6 +9,7 @@ members = [
     "skill-media",
     "skill-memory",
     "skill-message",
+    "skill-record-window",
     "skill-reminder",
     "skill-screenshot",
     "skill-shopping-list",
@@ -33,6 +34,7 @@ skill-distance = { path = "skill-distance" }
 skill-media = { path = "skill-media" }
 skill-memory = { path = "skill-memory" }
 skill-message = { path = "skill-message" }
+skill-record-window = { path = "skill-record-window" }
 skill-reminder = { path = "skill-reminder" }
 skill-screenshot = { path = "skill-screenshot" }
 skill-shopping-list = { path = "skill-shopping-list" }

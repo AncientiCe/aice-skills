@@ -14,6 +14,7 @@ pub const ALL_SKILL_IDS: &[&str] = &[
     "skill_assistant",
     "skill_media",
     "skill_computer",
+    "skill_record_window",
     "skill_screenshot",
     "skill_app_switcher",
     "skill_reminder",
@@ -42,6 +43,10 @@ pub use skill_memory::{
 };
 pub use skill_message::{
     MacOsMessagesSkill, MessageResult, MessageSkill, MessageSkillError, MockMessageSkill,
+};
+pub use skill_record_window::{
+    MacOsRecordWindowSkill, MockRecordWindowSkill, RecordWindowResult, RecordWindowSkill,
+    RecordWindowSkillError,
 };
 pub use skill_reminder::{
     MacOsReminderSkill, MockReminderSkill, ReminderResult, ReminderSkill, ReminderSkillError,
