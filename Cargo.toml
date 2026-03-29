@@ -27,19 +27,42 @@ edition = "2021"
 description = "Skill registry and re-exports for voice assistant skills"
 
 [dependencies]
-skill-app-switcher = { path = "skill-app-switcher" }
-skill-assistant = { path = "skill-assistant" }
-skill-computer = { path = "skill-computer" }
-skill-distance = { path = "skill-distance" }
-skill-media = { path = "skill-media" }
-skill-memory = { path = "skill-memory" }
-skill-message = { path = "skill-message" }
-skill-record-window = { path = "skill-record-window" }
-skill-reminder = { path = "skill-reminder" }
-skill-screenshot = { path = "skill-screenshot" }
-skill-shopping-list = { path = "skill-shopping-list" }
-skill-smart-home = { path = "skill-smart-home" }
-skill-time = { path = "skill-time" }
-skill-timer = { path = "skill-timer" }
-skill-volume = { path = "skill-volume" }
-skill-weather = { path = "skill-weather" }
+skill-app-switcher = { path = "skill-app-switcher", optional = true }
+skill-assistant = { path = "skill-assistant", optional = true }
+skill-computer = { path = "skill-computer", optional = true }
+skill-distance = { path = "skill-distance", optional = true }
+skill-media = { path = "skill-media", optional = true }
+skill-memory = { path = "skill-memory", optional = true }
+skill-message = { path = "skill-message", optional = true }
+skill-record-window = { path = "skill-record-window", optional = true }
+skill-reminder = { path = "skill-reminder", optional = true }
+skill-screenshot = { path = "skill-screenshot", optional = true }
+skill-shopping-list = { path = "skill-shopping-list", optional = true }
+skill-smart-home = { path = "skill-smart-home", optional = true }
+skill-time = { path = "skill-time", optional = true }
+skill-timer = { path = "skill-timer", optional = true }
+skill-volume = { path = "skill-volume", optional = true }
+skill-weather = { path = "skill-weather", optional = true }
+
+[features]
+default = ["core-common"]
+core-common = ["dep:skill-time", "dep:skill-weather", "dep:skill-distance"]
+core-macos = []
+core-windows = []
+macos = [
+    "dep:skill-app-switcher",
+    "dep:skill-assistant",
+    "dep:skill-computer",
+    "dep:skill-media",
+    "dep:skill-memory",
+    "dep:skill-message",
+    "dep:skill-record-window",
+    "dep:skill-reminder",
+    "dep:skill-screenshot",
+    "dep:skill-shopping-list",
+    "dep:skill-smart-home",
+    "dep:skill-timer",
+    "dep:skill-volume",
+]
+windows = []
+ios = []
