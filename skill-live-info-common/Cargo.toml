@@ -1,0 +1,7 @@
+[package]
+name = "skill-live-info-common"
+version = "0.1.0"
+edition = "2021"
+description = "Shared cache and retry utilities for live-info skills"
+
+[dependencies]

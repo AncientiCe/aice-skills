@@ -18,6 +18,16 @@ pub static ENABLED_SKILL_IDS: &[&str] = &[
     "skill_time",
     #[cfg(feature = "core-common")]
     "skill_distance",
+    #[cfg(feature = "core-common")]
+    "skill_sports_live",
+    #[cfg(feature = "core-common")]
+    "skill_holiday_lookup",
+    #[cfg(feature = "core-common")]
+    "skill_fuel_price_lookup",
+    #[cfg(feature = "core-common")]
+    "skill_horoscope_daily",
+    #[cfg(feature = "core-common")]
+    "skill_news_headlines",
     #[cfg(feature = "macos")]
     "skill_smart_home",
     #[cfg(feature = "macos")]
@@ -66,6 +76,21 @@ pub use skill_computer::{
 pub use skill_distance::{
     DistanceResult, DistanceSkill, DistanceSkillError, MockDistanceSkill, OpenMeteoDistanceSkill,
 };
+#[cfg(feature = "core-common")]
+pub use skill_fuel_price_lookup::{
+    FuelPriceLookupError, FuelPriceLookupQuery, FuelPriceLookupResult, FuelPriceLookupSkill,
+    HttpFuelPriceLookupSkill, MockFuelPriceLookupSkill,
+};
+#[cfg(feature = "core-common")]
+pub use skill_holiday_lookup::{
+    HolidayLookupError, HolidayLookupResult, HolidayLookupSkill, HolidayMatch, HolidayQuery,
+    HttpHolidayLookupSkill, MockHolidayLookupSkill,
+};
+#[cfg(feature = "core-common")]
+pub use skill_horoscope_daily::{
+    HoroscopeDailyError, HoroscopeDailyQuery, HoroscopeDailyResult, HoroscopeDailySkill,
+    HttpHoroscopeDailySkill, MockHoroscopeDailySkill,
+};
 #[cfg(feature = "macos")]
 pub use skill_media::{MacOsMusicSkill, MediaResult, MediaSkill, MediaSkillError, MockMediaSkill};
 #[cfg(feature = "macos")]
@@ -75,6 +100,11 @@ pub use skill_memory::{
 #[cfg(feature = "macos")]
 pub use skill_message::{
     MacOsMessagesSkill, MessageResult, MessageSkill, MessageSkillError, MockMessageSkill,
+};
+#[cfg(feature = "core-common")]
+pub use skill_news_headlines::{
+    HttpNewsHeadlinesSkill, MockNewsHeadlinesSkill, NewsHeadline, NewsHeadlinesError,
+    NewsHeadlinesQuery, NewsHeadlinesResult, NewsHeadlinesSkill,
 };
 #[cfg(feature = "macos")]
 pub use skill_record_window::{
@@ -99,6 +129,11 @@ pub use skill_shopping_list::{
 pub use skill_smart_home::{
     DeviceState, HueSmartHomeSkill, MockSmartHomeSkill, SmartHomeResult, SmartHomeSkill,
     SmartHomeSkillError,
+};
+#[cfg(feature = "core-common")]
+pub use skill_sports_live::{
+    HttpSportsLiveSkill, MockSportsLiveSkill, SportsEvent, SportsLiveError, SportsLiveQuery,
+    SportsLiveResult, SportsLiveSkill,
 };
 #[cfg(feature = "core-common")]
 pub use skill_time::{MockTimeSkill, OpenMeteoTimeSkill, TimeResult, TimeSkill, TimeSkillError};

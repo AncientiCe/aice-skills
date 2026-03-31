@@ -2,18 +2,24 @@
 resolver = "2"
 members = [
     ".",
+    "skill-live-info-common",
     "skill-app-switcher",
     "skill-assistant",
     "skill-computer",
     "skill-distance",
+    "skill-fuel-price-lookup",
+    "skill-holiday-lookup",
+    "skill-horoscope-daily",
     "skill-media",
     "skill-memory",
     "skill-message",
+    "skill-news-headlines",
     "skill-record-window",
     "skill-reminder",
     "skill-screenshot",
     "skill-shopping-list",
     "skill-smart-home",
+    "skill-sports-live",
     "skill-time",
     "skill-timer",
     "skill-volume",
@@ -31,14 +37,19 @@ skill-app-switcher = { path = "skill-app-switcher", optional = true }
 skill-assistant = { path = "skill-assistant", optional = true }
 skill-computer = { path = "skill-computer", optional = true }
 skill-distance = { path = "skill-distance", optional = true }
+skill-fuel-price-lookup = { path = "skill-fuel-price-lookup", optional = true }
+skill-holiday-lookup = { path = "skill-holiday-lookup", optional = true }
+skill-horoscope-daily = { path = "skill-horoscope-daily", optional = true }
 skill-media = { path = "skill-media", optional = true }
 skill-memory = { path = "skill-memory", optional = true }
 skill-message = { path = "skill-message", optional = true }
+skill-news-headlines = { path = "skill-news-headlines", optional = true }
 skill-record-window = { path = "skill-record-window", optional = true }
 skill-reminder = { path = "skill-reminder", optional = true }
 skill-screenshot = { path = "skill-screenshot", optional = true }
 skill-shopping-list = { path = "skill-shopping-list", optional = true }
 skill-smart-home = { path = "skill-smart-home", optional = true }
+skill-sports-live = { path = "skill-sports-live", optional = true }
 skill-time = { path = "skill-time", optional = true }
 skill-timer = { path = "skill-timer", optional = true }
 skill-volume = { path = "skill-volume", optional = true }
@@ -46,7 +57,16 @@ skill-weather = { path = "skill-weather", optional = true }
 
 [features]
 default = ["core-common"]
-core-common = ["dep:skill-time", "dep:skill-weather", "dep:skill-distance"]
+core-common = [
+    "dep:skill-time",
+    "dep:skill-weather",
+    "dep:skill-distance",
+    "dep:skill-sports-live",
+    "dep:skill-holiday-lookup",
+    "dep:skill-fuel-price-lookup",
+    "dep:skill-horoscope-daily",
+    "dep:skill-news-headlines",
+]
 core-macos = []
 core-windows = []
 macos = [
