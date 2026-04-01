@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use skill_chain::{
     ChainExecutor, ChainPlan, ChainPlanner, ChainPlannerError, ChainStep, ConfirmationError,
     ConfirmationHandler, DonePayload, DoneStatus, EffectiveCapabilities, PlannerRequest,
-    RunSkillStep, SkillRunError, SkillRunRequest, SkillRunResult, SkillRunner,
-    SpeakUpdateStep, StepTarget, TtsError, TtsNotifier,
+    RunSkillStep, SkillRunError, SkillRunRequest, SkillRunResult, SkillRunner, SpeakUpdateStep,
+    StepTarget, TtsError, TtsNotifier,
 };
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
