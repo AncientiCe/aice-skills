@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     ".",
+    "skill-chain",
     "skill-live-info-common",
     "skill-app-switcher",
     "skill-assistant",

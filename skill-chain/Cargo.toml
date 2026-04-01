@@ -1,0 +1,14 @@
+[package]
+name = "skill-chain"
+version = "0.1.0"
+edition = "2021"
+description = "Orchestration runtime for phrase-to-skill chains with TTS updates"
+
+[dependencies]
+async-trait = "0.1"
+core-skills = { path = ".." }
+metrics = "0.21"
+thiserror = "1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
