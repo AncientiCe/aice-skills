@@ -54,6 +54,8 @@ pub static ENABLED_SKILL_IDS: &[&str] = &[
     "skill_message",
     #[cfg(feature = "macos")]
     "skill_volume",
+    #[cfg(feature = "windows")]
+    "skill_windows_apple_music",
 ];
 
 /// Backward-compatible alias for enabled skills in the active build.
@@ -149,4 +151,9 @@ pub use skill_volume::{
 pub use skill_weather::{
     MockWeatherSkill, OpenMeteoWeatherSkill, ResolvedLocation, WeatherResult, WeatherSkill,
     WeatherSkillError,
+};
+#[cfg(feature = "windows")]
+pub use skill_windows_apple_music::{
+    MockWindowsAppleMusicSkill, WindowsAppleMusic, WindowsAppleMusicResult, WindowsAppleMusicSkill,
+    WindowsAppleMusicSkillError,
 };

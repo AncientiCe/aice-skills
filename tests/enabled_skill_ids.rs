@@ -27,8 +27,17 @@ fn macos_bundle_includes_macos_frontend_skills() {
     assert!(ENABLED_SKILL_IDS.contains(&"skill_screenshot"));
 }
 
-#[cfg(any(feature = "windows", feature = "ios"))]
+#[cfg(feature = "windows")]
 #[test]
-fn windows_and_ios_bundles_currently_only_include_core_common_skills() {
+fn windows_bundle_includes_windows_frontend_skill_and_core_common() {
+    for core_skill in CORE_COMMON_SKILLS {
+        assert!(ENABLED_SKILL_IDS.contains(&core_skill));
+    }
+    assert!(ENABLED_SKILL_IDS.contains(&"skill_windows_apple_music"));
+}
+
+#[cfg(feature = "ios")]
+#[test]
+fn ios_bundle_currently_only_includes_core_common_skills() {
     assert_eq!(ENABLED_SKILL_IDS, CORE_COMMON_SKILLS);
 }

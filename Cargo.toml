@@ -25,6 +25,7 @@ members = [
     "skill-timer",
     "skill-volume",
     "skill-weather",
+    "skill-windows-apple-music",
 ]
 
 [package]
@@ -55,6 +56,7 @@ skill-time = { path = "skill-time", optional = true }
 skill-timer = { path = "skill-timer", optional = true }
 skill-volume = { path = "skill-volume", optional = true }
 skill-weather = { path = "skill-weather", optional = true }
+skill-windows-apple-music = { path = "skill-windows-apple-music", optional = true }
 
 [features]
 default = ["core-common"]
@@ -85,5 +87,7 @@ macos = [
     "dep:skill-timer",
     "dep:skill-volume",
 ]
-windows = []
+windows = [
+    "dep:skill-windows-apple-music",
+]
 ios = []
