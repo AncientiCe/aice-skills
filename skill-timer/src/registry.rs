@@ -111,7 +111,7 @@ impl TimerRegistry {
         let mut inner = self.lock();
         inner.prune(now);
         let mut out: Vec<TimerStatus> = inner.timers.values().map(|t| t.to_status(now)).collect();
-        out.sort_by(|a, b| a.remaining_seconds.cmp(&b.remaining_seconds));
+        out.sort_by_key(|s| s.remaining_seconds);
         out
     }
 
