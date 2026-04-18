@@ -15,6 +15,7 @@ use crate::types::{
     ChainPlan, ChainStep, DonePayload, DoneStatus, RunSkillStep, SpeakUpdateStep, StepTarget,
 };
 use std::collections::BTreeMap;
+use std::str::FromStr;
 
 /// Identifier for a built-in routine. Stable strings — safe to persist in
 /// configuration or recall via voice ("run my wind down routine").
@@ -35,14 +36,24 @@ impl RoutineId {
             Self::Commute => "commute",
         }
     }
+}
 
-    pub fn from_str(value: &str) -> Option<Self> {
+/// Returned when a string can't be parsed into a [`RoutineId`]. Carries the
+/// offending input so callers can surface a helpful error.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("unknown routine id: {0:?}")]
+pub struct UnknownRoutineId(pub String);
+
+impl FromStr for RoutineId {
+    type Err = UnknownRoutineId;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value.trim().to_lowercase().as_str() {
-            "morning_briefing" | "morning briefing" | "morning" => Some(Self::MorningBriefing),
-            "wind_down" | "wind down" | "winddown" | "evening" => Some(Self::WindDown),
-            "focus" | "deep_work" | "deep work" => Some(Self::Focus),
-            "commute" => Some(Self::Commute),
-            _ => None,
+            "morning_briefing" | "morning briefing" | "morning" => Ok(Self::MorningBriefing),
+            "wind_down" | "wind down" | "winddown" | "evening" => Ok(Self::WindDown),
+            "focus" | "deep_work" | "deep work" => Ok(Self::Focus),
+            "commute" => Ok(Self::Commute),
+            _ => Err(UnknownRoutineId(value.to_string())),
         }
     }
 }
@@ -262,7 +273,7 @@ mod tests {
     fn routine_id_round_trips_through_strings() {
         for template in routine_catalog() {
             let s = template.id.as_str();
-            assert_eq!(RoutineId::from_str(s), Some(template.id));
+            assert_eq!(s.parse::<RoutineId>().ok(), Some(template.id));
         }
     }
 
@@ -275,10 +286,24 @@ mod tests {
     #[test]
     fn routine_id_accepts_natural_aliases() {
         assert_eq!(
-            RoutineId::from_str("morning briefing"),
+            "morning briefing".parse::<RoutineId>().ok(),
             Some(RoutineId::MorningBriefing)
         );
-        assert_eq!(RoutineId::from_str("wind down"), Some(RoutineId::WindDown));
-        assert_eq!(RoutineId::from_str("deep work"), Some(RoutineId::Focus));
+        assert_eq!(
+            "wind down".parse::<RoutineId>().ok(),
+            Some(RoutineId::WindDown)
+        );
+        assert_eq!(
+            "deep work".parse::<RoutineId>().ok(),
+            Some(RoutineId::Focus)
+        );
+    }
+
+    #[test]
+    fn routine_id_returns_unknown_for_garbage() {
+        let err = "tea time"
+            .parse::<RoutineId>()
+            .expect_err("expected error");
+        assert_eq!(err, UnknownRoutineId("tea time".to_string()));
     }
 }
