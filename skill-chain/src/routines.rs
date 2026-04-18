@@ -301,9 +301,7 @@ mod tests {
 
     #[test]
     fn routine_id_returns_unknown_for_garbage() {
-        let err = "tea time"
-            .parse::<RoutineId>()
-            .expect_err("expected error");
+        let err = "tea time".parse::<RoutineId>().expect_err("expected error");
         assert_eq!(err, UnknownRoutineId("tea time".to_string()));
     }
 }
