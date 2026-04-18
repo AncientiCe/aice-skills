@@ -1,0 +1,13 @@
+[package]
+name = "skill-translate"
+version = "0.1.0"
+edition = "2021"
+description = "Translation skill: phrase translation via local LLM (no external service)"
+
+[dependencies]
+async-trait = "0.1"
+metrics = "0.21"
+thiserror = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }

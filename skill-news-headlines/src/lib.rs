@@ -1,8 +1,11 @@
 mod http_provider;
+mod summarize;
 mod types;
 
+pub use summarize::{collect_summaries, stream_summaries, NewsSummaryEvent};
 pub use types::{
     NewsHeadline, NewsHeadlinesError, NewsHeadlinesQuery, NewsHeadlinesResult, NewsHeadlinesSkill,
+    NewsSummaryLlm, SummarizedHeadline,
 };
 
 use async_trait::async_trait;

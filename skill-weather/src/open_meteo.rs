@@ -1,6 +1,9 @@
 //! Open-Meteo API: geocoding and forecast (no API key).
 
-use crate::types::{ResolvedLocation, WeatherResult, WeatherSkill, WeatherSkillError};
+use crate::types::{
+    AlertSeverity, DailyForecast, ResolvedLocation, SevereAlert, WeatherResult, WeatherSkill,
+    WeatherSkillError,
+};
 use async_trait::async_trait;
 use metrics::{counter, histogram};
 use serde::Deserialize;
@@ -31,6 +34,7 @@ struct GeocodingResult {
 #[derive(Deserialize)]
 struct ForecastResponse {
     current: Option<CurrentWeather>,
+    daily: Option<DailyBlock>,
 }
 
 #[derive(Deserialize)]
@@ -38,6 +42,23 @@ struct CurrentWeather {
     temperature_2m: f64,
     relative_humidity_2m: Option<f64>,
     weather_code: u16,
+    wind_speed_10m: Option<f64>,
+}
+
+#[derive(Deserialize, Default)]
+struct DailyBlock {
+    #[serde(default)]
+    time: Vec<String>,
+    #[serde(default)]
+    temperature_2m_max: Vec<f64>,
+    #[serde(default)]
+    temperature_2m_min: Vec<f64>,
+    #[serde(default)]
+    weather_code: Vec<u16>,
+    #[serde(default)]
+    precipitation_probability_max: Vec<Option<f64>>,
+    #[serde(default)]
+    wind_gusts_10m_max: Vec<Option<f64>>,
 }
 
 /// Open-Meteo weather skill implementation.
@@ -133,8 +154,16 @@ impl OpenMeteoWeatherSkill {
                 ("longitude", loc.lon.to_string()),
                 (
                     "current",
-                    "temperature_2m,relative_humidity_2m,weather_code".to_string(),
+                    "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m".to_string(),
                 ),
+                (
+                    "daily",
+                    "temperature_2m_max,temperature_2m_min,weather_code,\
+                     precipitation_probability_max,wind_gusts_10m_max"
+                        .to_string(),
+                ),
+                ("forecast_days", "5".to_string()),
+                ("timezone", "auto".to_string()),
             ])
             .send()
             .await
@@ -167,14 +196,109 @@ impl OpenMeteoWeatherSkill {
         let humidity_pct = current
             .relative_humidity_2m
             .map(|h| h.clamp(0.0, 100.0) as u8);
+        let daily = body.daily.unwrap_or_default();
+        let daily_forecast = build_daily_forecast(&daily);
+        let alerts = synthesize_alerts(current.weather_code, current.wind_speed_10m, &daily);
         Ok(WeatherResult {
             location_display: loc.display_name.clone(),
             temp_c: current.temperature_2m,
             humidity_pct,
             weather_code: current.weather_code,
             description,
+            daily_forecast,
+            alerts,
         })
     }
+}
+
+fn build_daily_forecast(daily: &DailyBlock) -> Vec<DailyForecast> {
+    let len = daily.time.len();
+    let mut out = Vec::with_capacity(len);
+    for i in 0..len {
+        let max = daily.temperature_2m_max.get(i).copied().unwrap_or(0.0);
+        let min = daily.temperature_2m_min.get(i).copied().unwrap_or(0.0);
+        let code = daily.weather_code.get(i).copied().unwrap_or(0);
+        let pop = daily
+            .precipitation_probability_max
+            .get(i)
+            .and_then(|p| *p)
+            .map(|p| p.clamp(0.0, 100.0) as u8);
+        out.push(DailyForecast {
+            date: daily.time[i].clone(),
+            temp_max_c: max,
+            temp_min_c: min,
+            weather_code: code,
+            description: weather_code_to_description(code),
+            precipitation_probability_pct: pop,
+        });
+    }
+    out
+}
+
+/// Open-Meteo's free tier doesn't include first-party severe-weather alerts
+/// for every region. We synthesize a minimal set from current + daily values
+/// so users get *some* heads-up without paying for a separate alerts API.
+fn synthesize_alerts(
+    current_code: u16,
+    current_wind_kmh: Option<f64>,
+    daily: &DailyBlock,
+) -> Vec<SevereAlert> {
+    let mut alerts = Vec::new();
+    if matches!(current_code, 95 | 96 | 99) {
+        alerts.push(SevereAlert {
+            severity: AlertSeverity::Warning,
+            kind: "thunderstorm".to_string(),
+            message: "Thunderstorm conditions reported now.".to_string(),
+        });
+    }
+    if let Some(w) = current_wind_kmh {
+        if w >= 90.0 {
+            alerts.push(SevereAlert {
+                severity: AlertSeverity::Warning,
+                kind: "high_wind".to_string(),
+                message: format!("High winds: {w:.0} km/h."),
+            });
+        } else if w >= 60.0 {
+            alerts.push(SevereAlert {
+                severity: AlertSeverity::Watch,
+                kind: "wind".to_string(),
+                message: format!("Strong winds: {w:.0} km/h."),
+            });
+        }
+    }
+    for (i, code) in daily.weather_code.iter().enumerate() {
+        if matches!(code, 71 | 73 | 75 | 85 | 86) {
+            let when = daily
+                .time
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| format!("day {i}"));
+            alerts.push(SevereAlert {
+                severity: AlertSeverity::Advisory,
+                kind: "snow".to_string(),
+                message: format!("Snow expected on {when}."),
+            });
+            break;
+        }
+    }
+    for (i, gust_opt) in daily.wind_gusts_10m_max.iter().enumerate() {
+        if let Some(gust) = gust_opt {
+            if *gust >= 90.0 {
+                let when = daily
+                    .time
+                    .get(i)
+                    .cloned()
+                    .unwrap_or_else(|| format!("day {i}"));
+                alerts.push(SevereAlert {
+                    severity: AlertSeverity::Watch,
+                    kind: "wind_gust".to_string(),
+                    message: format!("Gusts up to {gust:.0} km/h on {when}."),
+                });
+                break;
+            }
+        }
+    }
+    alerts
 }
 
 fn geocode_candidates(raw: &str) -> Vec<String> {
@@ -334,7 +458,8 @@ fn error_kind(error: &WeatherSkillError) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::geocode_candidates;
+    use super::{build_daily_forecast, geocode_candidates, synthesize_alerts, DailyBlock};
+    use crate::types::AlertSeverity;
 
     #[test]
     fn geocode_candidates_strip_trailing_punctuation() {
@@ -364,5 +489,51 @@ mod tests {
             "expected LA alias expansion, got: {:?}",
             cands
         );
+    }
+
+    #[test]
+    fn build_daily_forecast_zips_arrays() {
+        let daily = DailyBlock {
+            time: vec!["2026-04-18".into(), "2026-04-19".into()],
+            temperature_2m_max: vec![20.0, 22.0],
+            temperature_2m_min: vec![10.0, 12.0],
+            weather_code: vec![0, 61],
+            precipitation_probability_max: vec![Some(10.0), Some(80.0)],
+            wind_gusts_10m_max: vec![Some(20.0), Some(30.0)],
+        };
+        let out = build_daily_forecast(&daily);
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0].date, "2026-04-18");
+        assert_eq!(out[0].description, "Clear sky");
+        assert_eq!(out[1].precipitation_probability_pct, Some(80));
+        assert_eq!(out[1].description, "Rain");
+    }
+
+    #[test]
+    fn synthesize_alerts_flags_thunderstorm_and_high_wind() {
+        let alerts = synthesize_alerts(95, Some(95.0), &DailyBlock::default());
+        assert!(alerts.iter().any(|a| a.kind == "thunderstorm"));
+        assert!(alerts
+            .iter()
+            .any(|a| a.kind == "high_wind" && a.severity == AlertSeverity::Warning));
+    }
+
+    #[test]
+    fn synthesize_alerts_flags_snow_advisory() {
+        let daily = DailyBlock {
+            time: vec!["2026-04-18".into(), "2026-04-19".into()],
+            weather_code: vec![1, 75],
+            ..Default::default()
+        };
+        let alerts = synthesize_alerts(1, None, &daily);
+        assert!(alerts
+            .iter()
+            .any(|a| a.kind == "snow" && a.severity == AlertSeverity::Advisory));
+    }
+
+    #[test]
+    fn synthesize_alerts_quiet_when_calm() {
+        let alerts = synthesize_alerts(0, Some(10.0), &DailyBlock::default());
+        assert!(alerts.is_empty(), "expected no alerts, got {:?}", alerts);
     }
 }

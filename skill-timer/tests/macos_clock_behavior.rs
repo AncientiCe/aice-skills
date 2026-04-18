@@ -88,6 +88,47 @@ async fn dry_run_duration_with_hours_and_minutes() {
 }
 
 #[tokio::test]
+async fn registry_tracks_multiple_concurrent_timers() {
+    let skill = MacOsClockTimerSkill::new_for_tests();
+    skill.execute("10 minutes", Some("pasta")).await.must();
+    skill.execute("3 minutes", Some("steak")).await.must();
+    let active = skill.list().await;
+    assert_eq!(active.len(), 2);
+    let names: Vec<&str> = active.iter().map(|s| s.name.as_str()).collect();
+    assert!(names.contains(&"pasta"));
+    assert!(names.contains(&"steak"));
+}
+
+#[tokio::test]
+async fn remaining_returns_status_for_named_timer() {
+    let skill = MacOsClockTimerSkill::new_for_tests();
+    skill.execute("10 minutes", Some("eggs")).await.must();
+    let status = skill.remaining("eggs").await.must();
+    assert_eq!(status.name, "eggs");
+    assert_eq!(status.total_seconds, 600);
+    assert!(status.remaining_seconds <= 600);
+    assert!(!status.expired);
+}
+
+#[tokio::test]
+async fn cancel_removes_active_timer() {
+    let skill = MacOsClockTimerSkill::new_for_tests();
+    skill.execute("5 minutes", Some("nap")).await.must();
+    assert!(skill.cancel("nap").await);
+    assert!(skill.remaining("nap").await.is_none());
+    assert!(!skill.cancel("nap").await);
+}
+
+#[tokio::test]
+async fn duplicate_named_timer_gets_unique_suffix() {
+    let skill = MacOsClockTimerSkill::new_for_tests();
+    let a = skill.execute("5 minutes", Some("rice")).await.must();
+    let b = skill.execute("5 minutes", Some("rice")).await.must();
+    assert_eq!(a.timer_name, "rice");
+    assert_eq!(b.timer_name, "rice 2");
+}
+
+#[tokio::test]
 async fn to_prompt_context_contains_name_and_duration() {
     let skill = MacOsClockTimerSkill::new_for_tests();
     let result = skill.execute("20 minutes", Some("egg timer")).await.must();

@@ -1,28 +1,40 @@
 [workspace]
 resolver = "2"
+exclude = ["examples/skill-template"]
 members = [
     ".",
     "skill-chain",
     "skill-live-info-common",
+    "skill-air-quality",
     "skill-app-switcher",
-    "skill-assistant",
+    "skill-briefing",
+    "skill-calculator",
+    "skill-calendar",
     "skill-computer",
+    "skill-currency",
+    "skill-dictionary",
     "skill-distance",
+    "skill-email",
     "skill-fuel-price-lookup",
     "skill-holiday-lookup",
     "skill-horoscope-daily",
+    "skill-journal",
     "skill-media",
-    "skill-memory",
+    "skill-meeting-notes",
     "skill-message",
     "skill-news-headlines",
     "skill-record-window",
     "skill-reminder",
+    "skill-screen-ocr",
     "skill-screenshot",
     "skill-shopping-list",
     "skill-smart-home",
+    "skill-spotify",
     "skill-sports-live",
     "skill-time",
     "skill-timer",
+    "skill-translate",
+    "skill-unit-conversion",
     "skill-volume",
     "skill-weather",
     "skill-windows-apple-music",
@@ -35,25 +47,36 @@ edition = "2021"
 description = "Skill registry and re-exports for voice assistant skills"
 
 [dependencies]
+skill-air-quality = { path = "skill-air-quality", optional = true }
 skill-app-switcher = { path = "skill-app-switcher", optional = true }
-skill-assistant = { path = "skill-assistant", optional = true }
+skill-briefing = { path = "skill-briefing", optional = true }
+skill-calculator = { path = "skill-calculator", optional = true }
+skill-calendar = { path = "skill-calendar", optional = true }
 skill-computer = { path = "skill-computer", optional = true }
+skill-currency = { path = "skill-currency", optional = true }
+skill-dictionary = { path = "skill-dictionary", optional = true }
 skill-distance = { path = "skill-distance", optional = true }
+skill-email = { path = "skill-email", optional = true }
 skill-fuel-price-lookup = { path = "skill-fuel-price-lookup", optional = true }
 skill-holiday-lookup = { path = "skill-holiday-lookup", optional = true }
 skill-horoscope-daily = { path = "skill-horoscope-daily", optional = true }
+skill-journal = { path = "skill-journal", optional = true }
 skill-media = { path = "skill-media", optional = true }
-skill-memory = { path = "skill-memory", optional = true }
+skill-meeting-notes = { path = "skill-meeting-notes", optional = true }
 skill-message = { path = "skill-message", optional = true }
 skill-news-headlines = { path = "skill-news-headlines", optional = true }
 skill-record-window = { path = "skill-record-window", optional = true }
 skill-reminder = { path = "skill-reminder", optional = true }
+skill-screen-ocr = { path = "skill-screen-ocr", optional = true }
 skill-screenshot = { path = "skill-screenshot", optional = true }
 skill-shopping-list = { path = "skill-shopping-list", optional = true }
 skill-smart-home = { path = "skill-smart-home", optional = true }
+skill-spotify = { path = "skill-spotify", optional = true }
 skill-sports-live = { path = "skill-sports-live", optional = true }
 skill-time = { path = "skill-time", optional = true }
 skill-timer = { path = "skill-timer", optional = true }
+skill-translate = { path = "skill-translate", optional = true }
+skill-unit-conversion = { path = "skill-unit-conversion", optional = true }
 skill-volume = { path = "skill-volume", optional = true }
 skill-weather = { path = "skill-weather", optional = true }
 skill-windows-apple-music = { path = "skill-windows-apple-music", optional = true }
@@ -69,15 +92,27 @@ core-common = [
     "dep:skill-fuel-price-lookup",
     "dep:skill-horoscope-daily",
     "dep:skill-news-headlines",
+    "dep:skill-calculator",
+    "dep:skill-unit-conversion",
+    "dep:skill-currency",
+    "dep:skill-air-quality",
+    "dep:skill-dictionary",
+    "dep:skill-translate",
+    "dep:skill-spotify",
+    "dep:skill-media",
+    "dep:skill-calendar",
+    "dep:skill-meeting-notes",
+    "dep:skill-email",
+    "dep:skill-briefing",
+    "dep:skill-journal",
+    "dep:skill-screen-ocr",
 ]
 core-macos = []
 core-windows = []
 macos = [
     "dep:skill-app-switcher",
-    "dep:skill-assistant",
     "dep:skill-computer",
     "dep:skill-media",
-    "dep:skill-memory",
     "dep:skill-message",
     "dep:skill-record-window",
     "dep:skill-reminder",

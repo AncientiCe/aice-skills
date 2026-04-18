@@ -56,3 +56,26 @@ pub trait NewsHeadlinesSkill: Send + Sync {
         query: &NewsHeadlinesQuery,
     ) -> Result<NewsHeadlinesResult, NewsHeadlinesError>;
 }
+
+/// Per-headline summarizer that streams partial text chunks. Implementations
+/// typically wrap a local Ollama `LlmStream` from the backend `core-llm` crate.
+///
+/// The trait is intentionally narrow so this crate doesn't pull in
+/// `core-llm` directly; backend wiring adapts a real `LlmStream` to it.
+#[async_trait]
+pub trait NewsSummaryLlm: Send + Sync {
+    /// Produce a streaming summary for `headline`. Each yielded chunk is a
+    /// partial token/word stream. The receiver closes when generation ends.
+    async fn summarize(
+        &self,
+        headline: &NewsHeadline,
+    ) -> Result<tokio::sync::mpsc::Receiver<String>, NewsHeadlinesError>;
+}
+
+/// One headline + its (optionally streamed) summary, batched on completion.
+#[derive(Clone, Debug)]
+pub struct SummarizedHeadline {
+    pub headline: NewsHeadline,
+    pub summary: Option<String>,
+    pub summary_error: Option<String>,
+}

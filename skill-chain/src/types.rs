@@ -24,8 +24,6 @@ const CORE_COMMON_SKILLS: &[&str] = &[
 
 const MACOS_SKILLS: &[&str] = &[
     "skill_smart_home",
-    "skill_memory",
-    "skill_assistant",
     "skill_media",
     "skill_computer",
     "skill_record_window",

@@ -1,0 +1,15 @@
+[package]
+name = "skill-screen-ocr"
+version = "0.1.0"
+edition = "2021"
+description = "Screen OCR skill: screenshot -> OCR -> optional local LLM Q&A"
+
+[dependencies]
+async-trait = "0.1"
+metrics = "0.21"
+skill-screenshot = { path = "../skill-screenshot" }
+thiserror = "1.0"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["rt", "macros"] }

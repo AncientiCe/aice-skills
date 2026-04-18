@@ -1,0 +1,18 @@
+[package]
+name = "skill-spotify"
+version = "0.1.0"
+edition = "2021"
+description = "Cross-platform Spotify media skill (Web API + OAuth) implementing MediaSkill"
+
+[dependencies]
+async-trait = "0.1"
+metrics = "0.21"
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+skill-media = { path = "../skill-media" }
+thiserror = "1.0"
+url = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }

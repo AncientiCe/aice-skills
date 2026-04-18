@@ -1,0 +1,19 @@
+[package]
+name = "skill-briefing"
+version = "0.1.0"
+edition = "2021"
+description = "Personalized briefing skill: composes weather + calendar + email + news"
+
+[dependencies]
+async-trait = "0.1"
+metrics = "0.21"
+skill-calendar = { path = "../skill-calendar" }
+skill-email = { path = "../skill-email" }
+skill-news-headlines = { path = "../skill-news-headlines" }
+skill-weather = { path = "../skill-weather" }
+thiserror = "1.0"
+tokio = { version = "1", features = ["macros"] }
+
+[dev-dependencies]
+chrono = "0.4"
+tokio = { version = "1", features = ["rt", "macros"] }

@@ -1,0 +1,13 @@
+[package]
+name = "skill-unit-conversion"
+version = "0.1.0"
+edition = "2021"
+description = "Unit conversion skill: length, mass, volume, time, temperature; local conversion tables, no network"
+
+[dependencies]
+async-trait = "0.1"
+thiserror = "1.0"
+metrics = "0.21"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }

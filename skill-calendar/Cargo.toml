@@ -1,0 +1,18 @@
+[package]
+name = "skill-calendar"
+version = "0.1.0"
+edition = "2021"
+description = "Calendar skill: macOS Calendar.app (AppleScript) and Google Calendar (Web API + OAuth)"
+
+[dependencies]
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+metrics = "0.21"
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1.0"
+url = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }

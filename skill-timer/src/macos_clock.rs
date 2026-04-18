@@ -20,11 +20,12 @@
 //! notification. Otherwise the timer is named by ordinal position within the
 //! current session ("first timer", "second timer", …).
 
+use crate::registry::{TimerRegistry, TimerStatus};
 use crate::types::{TimerResult, TimerSkill, TimerSkillError};
 use async_trait::async_trait;
 use metrics::{counter, histogram};
 use std::process::{Command, Stdio};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 const TIMER_SKILL_EXECUTE_TOTAL: &str = "timer_skill_execute_total";
 const TIMER_SKILL_ERRORS_TOTAL: &str = "timer_skill_errors_total";
@@ -34,15 +35,27 @@ const TIMER_SKILL_EXECUTE_DURATION_SECONDS: &str = "timer_skill_execute_duration
 #[derive(Clone)]
 pub struct MacOsClockTimerSkill {
     dry_run: bool,
+    registry: TimerRegistry,
 }
 
 impl MacOsClockTimerSkill {
     pub fn new() -> Self {
-        Self { dry_run: false }
+        Self {
+            dry_run: false,
+            registry: TimerRegistry::new(),
+        }
     }
 
     pub fn new_for_tests() -> Self {
-        Self { dry_run: true }
+        Self {
+            dry_run: true,
+            registry: TimerRegistry::new(),
+        }
+    }
+
+    /// Access the in-process registry of active timers.
+    pub fn registry(&self) -> TimerRegistry {
+        self.registry.clone()
     }
 
     fn escape_applescript_string(value: &str) -> String {
@@ -235,17 +248,14 @@ impl MacOsClockTimerSkill {
         &self,
         duration: &str,
         name: Option<&str>,
-        // session_count is the number of timers already started this session,
-        // used for ordinal naming when no explicit name is given.
-        session_count: u64,
     ) -> Result<TimerResult, TimerSkillError> {
         let seconds = Self::parse_duration_seconds(duration)?;
-        let timer_name = match name {
-            Some(n) if !n.trim().is_empty() => n.trim().to_string(),
-            _ => format!("{} timer", Self::ordinal_name(session_count + 1)),
-        };
+        let timer_name = self.registry.add(name, Duration::from_secs(seconds));
         if !self.dry_run {
-            self.start_timer(seconds, &timer_name)?;
+            if let Err(err) = self.start_timer(seconds, &timer_name) {
+                self.registry.cancel(&timer_name);
+                return Err(err);
+            }
         }
         let duration_display = Self::format_duration(seconds);
         Ok(TimerResult {
@@ -271,9 +281,7 @@ impl TimerSkill for MacOsClockTimerSkill {
         name: Option<&str>,
     ) -> Result<TimerResult, TimerSkillError> {
         let t0 = Instant::now();
-        // session_count = 0: unnamed timers are always "first timer" within a
-        // single invocation. The caller (runtime) can pass a counter if needed.
-        let result = self.execute_inner(duration, name, 0).await;
+        let result = self.execute_inner(duration, name).await;
         match &result {
             Ok(_) => {
                 counter!(TIMER_SKILL_EXECUTE_TOTAL, 1, "result" => "success");
@@ -292,6 +300,18 @@ impl TimerSkill for MacOsClockTimerSkill {
             t0.elapsed().as_secs_f64()
         );
         result
+    }
+
+    async fn list(&self) -> Vec<TimerStatus> {
+        self.registry.list()
+    }
+
+    async fn remaining(&self, name: &str) -> Option<TimerStatus> {
+        self.registry.remaining(name)
+    }
+
+    async fn cancel(&self, name: &str) -> bool {
+        self.registry.cancel(name)
     }
 }
 

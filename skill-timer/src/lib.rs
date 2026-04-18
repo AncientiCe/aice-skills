@@ -1,9 +1,13 @@
-//! Timer skill: create macOS Clock timers with optional name.
+//! Timer skill: create macOS Clock timers with optional name. Also exposes a
+//! cross-platform [`TimerRegistry`] for tracking multiple named concurrent
+//! timers and querying remaining time.
 
 mod macos_clock;
+mod registry;
 mod types;
 
 pub use macos_clock::MacOsClockTimerSkill;
+pub use registry::{TimerRegistry, TimerStatus};
 pub use types::{TimerResult, TimerSkill, TimerSkillError};
 
 /// Stub implementation for tests and wiring without a real macOS Clock backend.

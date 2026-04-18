@@ -1,0 +1,16 @@
+[package]
+name = "skill-meeting-notes"
+version = "0.1.0"
+edition = "2021"
+description = "Meeting notes skill: transcript -> LLM summary + action-item extraction -> reminders"
+
+[dependencies]
+async-trait = "0.1"
+metrics = "0.21"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+skill-reminder = { path = "../skill-reminder" }
+thiserror = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }

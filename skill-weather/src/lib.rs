@@ -4,7 +4,10 @@ mod open_meteo;
 mod types;
 
 pub use open_meteo::OpenMeteoWeatherSkill;
-pub use types::{ResolvedLocation, WeatherResult, WeatherSkill, WeatherSkillError};
+pub use types::{
+    AlertSeverity, DailyForecast, ResolvedLocation, SevereAlert, WeatherResult, WeatherSkill,
+    WeatherSkillError,
+};
 
 /// Mock implementation for tests.
 pub struct MockWeatherSkill {

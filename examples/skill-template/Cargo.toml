@@ -1,0 +1,16 @@
+[workspace]
+
+[package]
+name = "skill-template"
+version = "0.1.0"
+edition = "2021"
+description = "Template crate for new skills. Copy this directory and rename."
+publish = false
+
+[dependencies]
+async-trait = "0.1"
+metrics = "0.21"
+thiserror = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }
