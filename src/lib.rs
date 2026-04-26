@@ -9,6 +9,12 @@ compile_error!("features `macos` and `windows` cannot be enabled together");
 compile_error!("features `macos` and `ios` cannot be enabled together");
 #[cfg(all(not(clippy), feature = "windows", feature = "ios"))]
 compile_error!("features `windows` and `ios` cannot be enabled together");
+#[cfg(all(not(clippy), feature = "hotel", feature = "macos"))]
+compile_error!("features `hotel` and `macos` cannot be enabled together");
+#[cfg(all(not(clippy), feature = "hotel", feature = "windows"))]
+compile_error!("features `hotel` and `windows` cannot be enabled together");
+#[cfg(all(not(clippy), feature = "hotel", feature = "ios"))]
+compile_error!("features `hotel` and `ios` cannot be enabled together");
 
 /// Skill IDs enabled for the current feature selection.
 pub static ENABLED_SKILL_IDS: &[&str] = &[
@@ -78,6 +84,8 @@ pub static ENABLED_SKILL_IDS: &[&str] = &[
     "skill_volume",
     #[cfg(feature = "windows")]
     "skill_windows_apple_music",
+    #[cfg(feature = "hotel")]
+    "skill_hotel",
 ];
 
 /// Backward-compatible alias for enabled skills in the active build.
@@ -147,6 +155,11 @@ pub use skill_holiday_lookup::{
 pub use skill_horoscope_daily::{
     HoroscopeDailyError, HoroscopeDailyQuery, HoroscopeDailyResult, HoroscopeDailySkill,
     HttpHoroscopeDailySkill, MockHoroscopeDailySkill,
+};
+#[cfg(feature = "hotel")]
+pub use skill_hotel::{
+    HotelError, HotelIntentKind, HotelMcpTransport, HotelQuery, HotelResult, HotelSkill,
+    LocalHotelSkill, McpHotelSkill, MockHotelSkill,
 };
 #[cfg(feature = "core-common")]
 pub use skill_journal::{

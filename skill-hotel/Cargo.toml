@@ -1,0 +1,15 @@
+[package]
+name = "skill-hotel"
+version = "0.1.0"
+edition = "2021"
+description = "Hotel concierge skill: dispatches structured intents to a per-property Hotel MCP transport"
+
+[dependencies]
+async-trait = "0.1"
+metrics = "0.21"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }

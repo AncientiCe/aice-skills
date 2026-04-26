@@ -86,6 +86,18 @@ against a locally hosted Ollama model.
 | --- | --- |
 | `skill-windows-apple-music` | Apple Music for Windows |
 
+### Hospitality / hotel concierge
+
+| Skill | Purpose |
+| --- | --- |
+| `skill-hotel` | In-room concierge (climate, lights, room service, wake-up calls, transport, complaints, late checkout, …). Dispatches to a per-property Hotel MCP transport so each chain plugs in their own backend. |
+
+See `examples/concierge-room/` for a tablet-style demo frontend that
+discovers `aice-backend` over UDP, performs intent classification, and
+forwards every classified hotel intent to the `examples/hotel-mcp/` JSON-RPC
+HTTP+SSE server. Both example crates are standalone; activate the skill in
+the backend and the desktop with the `hotel` feature flag.
+
 ---
 
 ## Feature buckets
@@ -97,6 +109,9 @@ Skill inclusion is compile-time only via Cargo features.
 - `macos` — macOS-only frontend skills.
 - `windows` — Windows-only frontend skills.
 - `ios` — iOS-only frontend skills.
+- `hotel` — `skill-hotel` (mutually exclusive with `macos` / `windows` /
+  `ios`; intended for hospitality frontends like
+  `examples/concierge-room/`).
 
 Default features: `[core-common]`.
 
@@ -124,6 +139,12 @@ Frontend (iOS):
 
 ```toml
 core-skills = { version = "*", default-features = false, features = ["core-common", "ios"] }
+```
+
+Hospitality frontend (concierge-room demo, hotel chains):
+
+```toml
+core-skills = { version = "*", default-features = false, features = ["core-common", "hotel"] }
 ```
 
 `ENABLED_SKILL_IDS` reflects whatever the active feature set produced.
@@ -155,7 +176,9 @@ aice-skills/
 ├── Cargo.toml              # workspace + feature-gated re-exports
 ├── src/lib.rs              # ENABLED_SKILL_IDS + pub use
 ├── examples/
-│   └── skill-template/     # copy this when starting a new skill
+│   ├── skill-template/     # copy this when starting a new skill
+│   ├── hotel-mcp/          # standalone JSON-RPC HTTP+SSE MCP server (demo executor for skill-hotel)
+│   └── concierge-room/     # standalone tablet-style hotel-room demo frontend (Rust bridge + browser UI)
 ├── skill-chain/            # routine planner + executor + templates
 ├── skill-live-info-common/ # shared cache + retry helpers
 ├── skill-<name>/           # individual skill crates

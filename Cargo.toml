@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
-exclude = ["examples/skill-template"]
+exclude = [
+    "examples/skill-template",
+    "examples/concierge-room",
+    "examples/hotel-mcp",
+]
 members = [
     ".",
     "skill-chain",
@@ -18,6 +22,7 @@ members = [
     "skill-fuel-price-lookup",
     "skill-holiday-lookup",
     "skill-horoscope-daily",
+    "skill-hotel",
     "skill-journal",
     "skill-media",
     "skill-meeting-notes",
@@ -60,6 +65,7 @@ skill-email = { path = "skill-email", optional = true }
 skill-fuel-price-lookup = { path = "skill-fuel-price-lookup", optional = true }
 skill-holiday-lookup = { path = "skill-holiday-lookup", optional = true }
 skill-horoscope-daily = { path = "skill-horoscope-daily", optional = true }
+skill-hotel = { path = "skill-hotel", optional = true }
 skill-journal = { path = "skill-journal", optional = true }
 skill-media = { path = "skill-media", optional = true }
 skill-meeting-notes = { path = "skill-meeting-notes", optional = true }
@@ -126,3 +132,6 @@ windows = [
     "dep:skill-windows-apple-music",
 ]
 ios = []
+hotel = [
+    "dep:skill-hotel",
+]
