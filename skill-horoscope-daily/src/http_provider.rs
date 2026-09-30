@@ -22,7 +22,8 @@ impl HttpHoroscopeDataProvider {
     pub fn new() -> Self {
         Self {
             client: reqwest::Client::new(),
-            base_url: "https://aztro.sameerkumar.website".to_string(),
+            // aztro.sameerkumar.website is gone (404 for every sign).
+            base_url: "https://freehoroscopeapi.com".to_string(),
         }
     }
     fn normalize_sign(sign: &str) -> Result<String, HoroscopeDailyError> {
@@ -65,11 +66,36 @@ impl Default for HttpHoroscopeDataProvider {
 }
 
 #[derive(Debug, Deserialize)]
-struct AztroResponse {
-    description: String,
-    mood: Option<String>,
-    color: Option<String>,
-    lucky_number: Option<String>,
+struct DailyResponse {
+    data: DailyData,
+}
+
+#[derive(Debug, Deserialize)]
+struct DailyData {
+    horoscope: String,
+}
+
+/// Daily horoscope URL on freehoroscopeapi.com; `day` is today, tomorrow or yesterday.
+fn daily_request_url(base_url: &str, sign: &str, day: &str) -> String {
+    format!(
+        "{}/api/v1/get-horoscope/daily?sign={}&day={}",
+        base_url.trim_end_matches('/'),
+        sign,
+        day.to_uppercase()
+    )
+}
+
+/// The horoscope text of a daily answer; an empty text is a parse error.
+fn parse_daily_response(body: &str) -> Result<String, HoroscopeDailyError> {
+    let payload: DailyResponse = serde_json::from_str(body)
+        .map_err(|err| HoroscopeDailyError::UpstreamParse(err.to_string()))?;
+    let text = payload.data.horoscope.trim();
+    if text.is_empty() {
+        return Err(HoroscopeDailyError::UpstreamParse(
+            "empty horoscope".to_string(),
+        ));
+    }
+    Ok(text.to_string())
 }
 
 #[async_trait]
@@ -82,8 +108,7 @@ impl HoroscopeDataProvider for HttpHoroscopeDataProvider {
         let day = Self::day_for_date(query.date)?;
         let response = self
             .client
-            .post(&self.base_url)
-            .query(&[("sign", sign.as_str()), ("day", day.as_str())])
+            .get(daily_request_url(&self.base_url, &sign, &day))
             .timeout(Duration::from_secs(8))
             .send()
             .await
@@ -100,18 +125,47 @@ impl HoroscopeDataProvider for HttpHoroscopeDataProvider {
                 response.status()
             )));
         }
-        let payload = response
-            .json::<AztroResponse>()
+        let body = response
+            .text()
             .await
             .map_err(|err| HoroscopeDailyError::UpstreamParse(err.to_string()))?;
+        let summary = parse_daily_response(&body)?;
+        // The provider gives only the text: no mood, colour or lucky number.
         Ok(HoroscopeDailyResult {
             sign,
             day,
-            summary: payload.description,
-            mood: payload.mood,
-            color: payload.color,
-            lucky_number: payload.lucky_number,
+            summary,
+            mood: None,
+            color: None,
+            lucky_number: None,
             as_of: SystemTime::now(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{daily_request_url, parse_daily_response};
+
+    #[test]
+    fn asks_the_provider_for_the_sign_and_day() {
+        let url = daily_request_url("https://freehoroscopeapi.com", "aries", "today");
+        assert_eq!(
+            url,
+            "https://freehoroscopeapi.com/api/v1/get-horoscope/daily?sign=aries&day=TODAY"
+        );
+    }
+
+    #[test]
+    fn reads_the_horoscope_text_from_the_provider_answer() {
+        let body = r#"{"data":{"date":"2026-09-30","period":"daily","sign":"Aries","horoscope":"A quiet day for reading."}}"#;
+        let text = parse_daily_response(body).unwrap_or_else(|error| panic!("{error}"));
+        assert_eq!(text, "A quiet day for reading.");
+    }
+
+    #[test]
+    fn an_answer_without_text_is_a_parse_error() {
+        assert!(parse_daily_response(r#"{"data":{"horoscope":"  "}}"#).is_err());
+        assert!(parse_daily_response("not json").is_err());
     }
 }
