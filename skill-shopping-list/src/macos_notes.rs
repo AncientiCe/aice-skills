@@ -25,7 +25,7 @@
 
 use crate::types::{ShoppingListResult, ShoppingListSkill, ShoppingListSkillError};
 use async_trait::async_trait;
-use chrono::{Datelike, Local, NaiveDate};
+use jiff::{civil::Date, Span, ZonedDateTime};
 use metrics::{counter, histogram};
 use std::process::Command;
 use std::time::Instant;
@@ -52,14 +52,14 @@ impl MacOsNotesShoppingListSkill {
         Self { dry_run: true }
     }
 
-    /// Resolve a natural `when` string to a `NaiveDate`. Defaults to today.
-    pub fn resolve_date(when: Option<&str>) -> NaiveDate {
-        let today = Local::now().date_naive();
+    /// Resolve a natural `when` string to a civil `Date`. Defaults to today.
+    pub fn resolve_date(when: Option<&str>) -> Date {
+        let today = ZonedDateTime::now().date();
         match when {
             None | Some("today") => today,
-            Some("tomorrow") => today + chrono::Duration::days(1),
+            Some("tomorrow") => today.saturating_add(Span::new().days(1)),
             Some(s) => {
-                if let Ok(d) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+                if let Ok(d) = Date::strptime("%Y-%m-%d", s) {
                     return d;
                 }
                 let lower = s.to_lowercase();
@@ -77,16 +77,15 @@ impl MacOsNotesShoppingListSkill {
         }
     }
 
-    fn next_weekday(from: NaiveDate, target_weekday: i64) -> NaiveDate {
-        use chrono::Datelike;
-        let current = from.weekday().num_days_from_monday() as i64;
+    fn next_weekday(from: Date, target_weekday: i64) -> Date {
+        let current = i64::from(from.weekday().to_monday_zero_offset());
         let days_ahead = (target_weekday - current).rem_euclid(7);
         let days_ahead = if days_ahead == 0 { 7 } else { days_ahead };
-        from + chrono::Duration::days(days_ahead)
+        from.saturating_add(Span::new().days(days_ahead))
     }
 
     /// Format a date as "DD Mon YYYY" (e.g. "19 Mar 2026").
-    pub fn format_note_date(date: NaiveDate) -> String {
+    pub fn format_note_date(date: Date) -> String {
         let months = [
             "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
         ];
@@ -95,7 +94,7 @@ impl MacOsNotesShoppingListSkill {
     }
 
     /// Build the note title for a given date.
-    pub fn note_title(date: NaiveDate) -> String {
+    pub fn note_title(date: Date) -> String {
         format!("Shopping List {}", Self::format_note_date(date))
     }
 
@@ -438,25 +437,12 @@ impl ShoppingListSkill for MacOsNotesShoppingListSkill {
 
 #[cfg(test)]
 mod tests {
-    pub trait TestOptionExt<T> {
-        fn must(self) -> T;
-    }
-
-    impl<T> TestOptionExt<T> for Option<T> {
-        fn must(self) -> T {
-            match self {
-                Some(value) => value,
-                None => panic!("expected Some(..) in test"),
-            }
-        }
-    }
-
     use super::MacOsNotesShoppingListSkill;
-    use chrono::NaiveDate;
+    use jiff::{civil::Date, Span, ZonedDateTime};
 
     #[test]
     fn note_title_formats_correctly() {
-        let date = NaiveDate::from_ymd_opt(2026, 3, 19).must();
+        let date = Date::new(2026, 3, 19).expect("valid date");
         assert_eq!(
             MacOsNotesShoppingListSkill::note_title(date),
             "Shopping List 19 Mar 2026"
@@ -465,7 +451,7 @@ mod tests {
 
     #[test]
     fn note_title_formats_single_digit_day() {
-        let date = NaiveDate::from_ymd_opt(2026, 3, 5).must();
+        let date = Date::new(2026, 3, 5).expect("valid date");
         assert_eq!(
             MacOsNotesShoppingListSkill::note_title(date),
             "Shopping List 5 Mar 2026"
@@ -642,7 +628,7 @@ mod tests {
 
     #[test]
     fn resolve_date_defaults_to_today() {
-        let today = chrono::Local::now().date_naive();
+        let today = ZonedDateTime::now().date();
         assert_eq!(MacOsNotesShoppingListSkill::resolve_date(None), today);
         assert_eq!(
             MacOsNotesShoppingListSkill::resolve_date(Some("today")),
@@ -652,7 +638,9 @@ mod tests {
 
     #[test]
     fn resolve_date_tomorrow() {
-        let tomorrow = chrono::Local::now().date_naive() + chrono::Duration::days(1);
+        let tomorrow = ZonedDateTime::now()
+            .date()
+            .saturating_add(Span::new().days(1));
         assert_eq!(
             MacOsNotesShoppingListSkill::resolve_date(Some("tomorrow")),
             tomorrow
@@ -660,8 +648,20 @@ mod tests {
     }
 
     #[test]
+    fn resolve_date_weekday_is_the_next_such_day_never_today() {
+        let today = ZonedDateTime::now().date();
+        for (name, offset) in [("monday", 0), ("friday", 4), ("sunday", 6)] {
+            let d = MacOsNotesShoppingListSkill::resolve_date(Some(name));
+            let ahead = i64::from(d.weekday().to_monday_zero_offset());
+            assert_eq!(ahead, offset, "{name}");
+            let gap = (d - today).get_days();
+            assert!((1..=7).contains(&gap), "{name} gap {gap}");
+        }
+    }
+
+    #[test]
     fn resolve_date_iso_string() {
         let d = MacOsNotesShoppingListSkill::resolve_date(Some("2026-03-25"));
-        assert_eq!(d, NaiveDate::from_ymd_opt(2026, 3, 25).must());
+        assert_eq!(d, Date::new(2026, 3, 25).expect("valid date"));
     }
 }

@@ -2,7 +2,7 @@
 
 use crate::types::{RecordWindowResult, RecordWindowSkill, RecordWindowSkillError};
 use async_trait::async_trait;
-use chrono::Local;
+use jiff::ZonedDateTime;
 use metrics::{counter, histogram};
 use std::env;
 use std::fs;
@@ -65,7 +65,7 @@ impl MacOsRecordWindowSkill {
     fn default_filename() -> String {
         format!(
             "record-window-{}.mp4",
-            Local::now().format("%Y-%m-%d-%H%M%S")
+            ZonedDateTime::now().strftime("%Y-%m-%d-%H%M%S")
         )
     }
 
@@ -375,5 +375,25 @@ impl RecordWindowSkill for MacOsRecordWindowSkill {
             t0.elapsed().as_secs_f64()
         );
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_filename_is_timestamped_mp4() {
+        let name = MacOsRecordWindowSkill::default_filename();
+        let stamp = name
+            .strip_prefix("record-window-")
+            .and_then(|rest| rest.strip_suffix(".mp4"))
+            .expect("prefix and suffix");
+        let digits: Vec<&str> = stamp.split('-').collect();
+        assert_eq!(
+            digits.iter().map(|p| p.len()).collect::<Vec<_>>(),
+            [4, 2, 2, 6]
+        );
+        assert!(digits.iter().all(|p| p.bytes().all(|b| b.is_ascii_digit())));
     }
 }

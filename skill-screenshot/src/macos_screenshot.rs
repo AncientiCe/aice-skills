@@ -2,7 +2,7 @@
 
 use crate::types::{ScreenshotResult, ScreenshotSkill, ScreenshotSkillError};
 use async_trait::async_trait;
-use chrono::Local;
+use jiff::ZonedDateTime;
 use metrics::{counter, histogram};
 use std::env;
 use std::fs;
@@ -29,7 +29,10 @@ impl MacOsScreenshotSkill {
     }
 
     fn default_filename() -> String {
-        format!("screenshot-{}.png", Local::now().format("%Y-%m-%d-%H%M%S"))
+        format!(
+            "screenshot-{}.png",
+            ZonedDateTime::now().strftime("%Y-%m-%d-%H%M%S")
+        )
     }
 
     fn normalize_filename(filename: Option<&str>) -> String {
@@ -127,5 +130,25 @@ impl ScreenshotSkill for MacOsScreenshotSkill {
             t0.elapsed().as_secs_f64()
         );
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_filename_is_timestamped_png() {
+        let name = MacOsScreenshotSkill::default_filename();
+        let stamp = name
+            .strip_prefix("screenshot-")
+            .and_then(|rest| rest.strip_suffix(".png"))
+            .expect("prefix and suffix");
+        let digits: Vec<&str> = stamp.split('-').collect();
+        assert_eq!(
+            digits.iter().map(|p| p.len()).collect::<Vec<_>>(),
+            [4, 2, 2, 6]
+        );
+        assert!(digits.iter().all(|p| p.bytes().all(|b| b.is_ascii_digit())));
     }
 }

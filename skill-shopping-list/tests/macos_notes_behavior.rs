@@ -65,7 +65,7 @@ async fn dry_run_remove_from_list_reports_not_found_on_empty() {
 #[tokio::test]
 async fn note_title_uses_today_when_no_when_given() {
     let skill = MacOsNotesShoppingListSkill::new_for_tests();
-    let today = chrono::Local::now().date_naive();
+    let today = jiff::ZonedDateTime::now().date();
     let expected_title = MacOsNotesShoppingListSkill::note_title(today);
     let result = skill.execute("add", "bread", None).await.must();
     assert_eq!(result.note_title, expected_title);
