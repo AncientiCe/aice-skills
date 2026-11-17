@@ -49,7 +49,7 @@ impl HttpHolidayLookupSkill {
                 .to_lowercase(),
             query
                 .date
-                .map(|date| date.format("%Y-%m-%d").to_string())
+                .map(|date| date.strftime("%Y-%m-%d").to_string())
                 .unwrap_or_default()
         )
     }
@@ -169,7 +169,7 @@ impl HolidayLookupSkill for MockHolidayLookupSkill {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::NaiveDate;
+    use jiff::civil::Date;
     use std::collections::VecDeque;
     use std::sync::Mutex;
     use std::time::SystemTime;
@@ -215,7 +215,7 @@ mod tests {
             region_code: None,
             matches: vec![HolidayMatch {
                 name: name.to_string(),
-                date: NaiveDate::from_ymd_opt(2026, 4, 5).expect("valid"),
+                date: Date::new(2026, 4, 5).expect("valid"),
                 is_public_holiday: true,
                 local_name: Some(name.to_string()),
                 observed_date: None,

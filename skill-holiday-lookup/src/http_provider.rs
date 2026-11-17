@@ -1,6 +1,6 @@
 use crate::types::{HolidayLookupError, HolidayLookupResult, HolidayMatch, HolidayQuery};
 use async_trait::async_trait;
-use chrono::{Datelike, NaiveDate, Utc};
+use jiff::{civil::Date, tz::TimeZone, Timestamp};
 use reqwest::StatusCode;
 use serde::Deserialize;
 use std::time::{Duration, SystemTime};
@@ -31,7 +31,7 @@ impl HttpHolidayDataProvider {
         Ok(normalized)
     }
     fn current_year() -> i32 {
-        Utc::now().year()
+        i32::from(Timestamp::now().to_zoned_datetime(TimeZone::UTC).year())
     }
 }
 impl Default for HttpHolidayDataProvider {
@@ -98,7 +98,7 @@ impl HolidayDataProvider for HttpHolidayDataProvider {
         let date_filter = query.date;
         let mut matches = Vec::new();
         for item in holidays {
-            let item_date = NaiveDate::parse_from_str(&item.date, "%Y-%m-%d")
+            let item_date = Date::strptime("%Y-%m-%d", &item.date)
                 .map_err(|err| HolidayLookupError::UpstreamParse(err.to_string()))?;
             if let Some(filter) = &name_filter {
                 let item_name = item.name.to_lowercase();

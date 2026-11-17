@@ -1,6 +1,6 @@
 use crate::types::{HoroscopeDailyError, HoroscopeDailyQuery, HoroscopeDailyResult};
 use async_trait::async_trait;
-use chrono::{Duration as ChronoDuration, Utc};
+use jiff::{civil::Date, tz::TimeZone, Timestamp};
 use serde::Deserialize;
 use std::time::{Duration, SystemTime};
 
@@ -47,13 +47,13 @@ impl HttpHoroscopeDataProvider {
             Err(HoroscopeDailyError::InvalidSign(sign.to_string()))
         }
     }
-    fn day_for_date(date: Option<chrono::NaiveDate>) -> Result<String, HoroscopeDailyError> {
-        let now = Utc::now().date_naive();
+    fn day_for_date(date: Option<Date>) -> Result<String, HoroscopeDailyError> {
+        let now = Timestamp::now().to_zoned_datetime(TimeZone::UTC).date();
         match date {
             None => Ok("today".to_string()),
             Some(value) if value == now => Ok("today".to_string()),
-            Some(value) if value == now - ChronoDuration::days(1) => Ok("yesterday".to_string()),
-            Some(value) if value == now + ChronoDuration::days(1) => Ok("tomorrow".to_string()),
+            Some(value) if now.yesterday().ok() == Some(value) => Ok("yesterday".to_string()),
+            Some(value) if now.tomorrow().ok() == Some(value) => Ok("tomorrow".to_string()),
             Some(value) => Err(HoroscopeDailyError::UnsupportedDate(value.to_string())),
         }
     }
@@ -113,5 +113,38 @@ impl HoroscopeDataProvider for HttpHoroscopeDataProvider {
             lucky_number: payload.lucky_number,
             as_of: SystemTime::now(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn today() -> Date {
+        Timestamp::now().to_zoned_datetime(TimeZone::UTC).date()
+    }
+
+    #[test]
+    fn day_for_date_maps_neighbouring_utc_days() {
+        let today = today();
+        assert_eq!(
+            HttpHoroscopeDataProvider::day_for_date(None).expect("day"),
+            "today"
+        );
+        assert_eq!(
+            HttpHoroscopeDataProvider::day_for_date(today.yesterday().ok()).expect("day"),
+            "yesterday"
+        );
+        assert_eq!(
+            HttpHoroscopeDataProvider::day_for_date(today.tomorrow().ok()).expect("day"),
+            "tomorrow"
+        );
+    }
+
+    #[test]
+    fn day_for_date_rejects_other_days_with_iso_text() {
+        let far = Date::new(2001, 2, 3).expect("date");
+        let err = HttpHoroscopeDataProvider::day_for_date(Some(far)).expect_err("unsupported");
+        assert!(matches!(err, HoroscopeDailyError::UnsupportedDate(ref d) if d == "2001-02-03"));
     }
 }
