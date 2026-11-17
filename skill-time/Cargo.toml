@@ -6,8 +6,7 @@ description = "Time skill: current time at a location (optional; default = curre
 
 [dependencies]
 async-trait = "0.1"
-chrono = "0.4"
-chrono-tz = "0.10"
+jiff = { version = "1", features = ["tzdb-bundle-always"] }
 reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 skill-weather = { path = "../skill-weather" }

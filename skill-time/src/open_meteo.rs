@@ -1,10 +1,10 @@
 //! Time skill: geocoding via Open-Meteo, then IANA timezone from forecast (timezone=auto).
-//! We ignore the API's "time" value and compute local time ourselves with chrono + chrono-tz
-//! from Utc::now(), so the time is always correct for the location.
+//! We ignore the API's "time" value and compute local time ourselves with jiff and its bundled
+//! tz database from the system clock, so the time is always correct for the location.
 
 use crate::types::{TimeResult, TimeSkill, TimeSkillError};
 use async_trait::async_trait;
-use chrono::Utc;
+use jiff::{tz::TimeZone, Timestamp, ZonedDateTime};
 use metrics::{counter, histogram};
 use serde::Deserialize;
 use skill_weather::ResolvedLocation;
@@ -37,14 +37,11 @@ struct ForecastResponse {
     timezone_abbreviation: Option<String>,
 }
 
-/// Parse IANA timezone (e.g. "Europe/London") and return current time in that zone.
-/// Falls back to UTC if the string is not a valid IANA name (e.g. "GMT" from API).
-fn parse_iana_and_now(tz_name: &str) -> chrono::DateTime<chrono_tz::Tz> {
-    use chrono_tz::Tz;
-    tz_name
-        .parse::<Tz>()
-        .map(|tz| Utc::now().with_timezone(&tz))
-        .unwrap_or_else(|_| Utc::now().with_timezone(&chrono_tz::UTC))
+/// Parse IANA timezone (e.g. "Europe/London") and return the given instant in that zone.
+/// Falls back to UTC if the string is not a valid IANA name.
+fn zoned_at(tz_name: &str, now: Timestamp) -> ZonedDateTime {
+    let tz = TimeZone::get(tz_name).unwrap_or(TimeZone::UTC);
+    now.to_zoned_datetime(tz)
 }
 
 /// Time skill using Open-Meteo (geocoding + timezone lookup), time from system clock.
@@ -190,8 +187,8 @@ impl OpenMeteoTimeSkill {
             .timezone_abbreviation
             .clone()
             .unwrap_or_else(|| tz_name.to_string());
-        let local_dt = parse_iana_and_now(tz_name);
-        let local_time = local_dt.format("%H:%M").to_string();
+        let local_dt = zoned_at(tz_name, Timestamp::now());
+        let local_time = local_dt.strftime("%H:%M").to_string();
         Ok(TimeResult {
             location_display: loc.display_name.clone(),
             local_time,
@@ -231,5 +228,38 @@ impl TimeSkill for OpenMeteoTimeSkill {
         }
         Self::record_backend_skill_duration(started_at);
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn at(s: &str) -> Timestamp {
+        s.parse().expect("timestamp")
+    }
+
+    fn hhmm(tz: &str, instant: &str) -> String {
+        zoned_at(tz, at(instant)).strftime("%H:%M").to_string()
+    }
+
+    #[test]
+    fn named_zone_applies_its_offset_and_daylight_saving() {
+        assert_eq!(hhmm("Europe/London", "2026-01-15T12:00:00Z"), "12:00");
+        assert_eq!(hhmm("Europe/London", "2026-07-15T12:00:00Z"), "13:00");
+        assert_eq!(hhmm("Asia/Kolkata", "2026-01-15T12:00:00Z"), "17:30");
+        assert_eq!(hhmm("America/New_York", "2026-01-15T12:00:00Z"), "07:00");
+    }
+
+    #[test]
+    fn unknown_zone_falls_back_to_utc() {
+        assert_eq!(hhmm("Not/AZone", "2026-07-15T12:34:00Z"), "12:34");
+        assert_eq!(hhmm("", "2026-07-15T12:34:00Z"), "12:34");
+    }
+
+    #[test]
+    fn utc_and_gmt_names_resolve() {
+        assert_eq!(hhmm("UTC", "2026-07-15T12:34:00Z"), "12:34");
+        assert_eq!(hhmm("GMT", "2026-07-15T12:34:00Z"), "12:34");
     }
 }
