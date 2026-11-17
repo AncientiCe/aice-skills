@@ -9,7 +9,7 @@ use crate::types::{
     CalendarAction, CalendarError, CalendarEvent, CalendarQuery, CalendarResult, CalendarSkill,
 };
 use async_trait::async_trait;
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use jiff::{civil, tz::TimeZone, SignedDuration, Timestamp};
 use metrics::{counter, histogram};
 use std::sync::Arc;
 use std::time::Instant;
@@ -150,31 +150,50 @@ impl GoogleCalendarSkill {
         self.auth.access_token().await.map_err(CalendarError::Auth)
     }
 
-    fn day_bounds_today() -> (DateTime<Utc>, DateTime<Utc>) {
-        let now = Utc::now();
+    fn day_bounds_today() -> (Timestamp, Timestamp) {
+        let now = Timestamp::now();
         let start = now
-            .date_naive()
-            .and_hms_opt(0, 0, 0)
-            .map(|n| Utc.from_utc_datetime(&n))
+            .to_zoned_datetime(TimeZone::UTC)
+            .date()
+            .to_datetime(civil::Time::midnight())
+            .to_zoned_datetime(TimeZone::UTC)
+            .map(|z| z.timestamp())
             .unwrap_or(now);
-        (start, start + Duration::days(1))
+        (
+            start,
+            start
+                .saturating_add(SignedDuration::from_hours(24))
+                .unwrap_or(start),
+        )
     }
 
-    fn day_bounds_tomorrow() -> (DateTime<Utc>, DateTime<Utc>) {
+    fn day_bounds_tomorrow() -> (Timestamp, Timestamp) {
         let (s, _e) = Self::day_bounds_today();
-        let start = s + Duration::days(1);
-        (start, start + Duration::days(1))
+        let start = s
+            .saturating_add(SignedDuration::from_hours(24))
+            .unwrap_or(s);
+        (
+            start,
+            start
+                .saturating_add(SignedDuration::from_hours(24))
+                .unwrap_or(start),
+        )
     }
 
-    fn upcoming_bounds(days: u32) -> (DateTime<Utc>, DateTime<Utc>) {
-        let start = Utc::now();
-        (start, start + Duration::days(days as i64))
+    fn upcoming_bounds(days: u32) -> (Timestamp, Timestamp) {
+        let start = Timestamp::now();
+        (
+            start,
+            start
+                .saturating_add(SignedDuration::from_hours(i64::from(days) * 24))
+                .unwrap_or(start),
+        )
     }
 
     async fn list_events(
         &self,
-        time_min: DateTime<Utc>,
-        time_max: DateTime<Utc>,
+        time_min: Timestamp,
+        time_max: Timestamp,
         calendar_id: Option<&str>,
     ) -> Result<Vec<CalendarEvent>, CalendarError> {
         let token = self.token().await?;
@@ -184,8 +203,8 @@ impl GoogleCalendarSkill {
         let path = format!(
             "/calendars/{calendar_enc}/events?singleEvents=true&orderBy=startTime\
              &timeMin={}&timeMax={}",
-            time_min.to_rfc3339(),
-            time_max.to_rfc3339()
+            to_rfc3339(time_min),
+            to_rfc3339(time_max)
         );
         let resp = self
             .transport
@@ -233,7 +252,11 @@ impl GoogleCalendarSkill {
         let start = query
             .start
             .ok_or_else(|| CalendarError::InvalidQuery("missing start time".to_string()))?;
-        let end = query.end.unwrap_or(start + Duration::hours(1));
+        let end = query.end.unwrap_or(
+            start
+                .saturating_add(SignedDuration::from_hours(1))
+                .unwrap_or(start),
+        );
         if end <= start {
             return Err(CalendarError::InvalidQuery(
                 "end must be after start".to_string(),
@@ -245,8 +268,8 @@ impl GoogleCalendarSkill {
         let path = format!("/calendars/{calendar_enc}/events");
         let mut payload = serde_json::json!({
             "summary": title,
-            "start": { "dateTime": start.to_rfc3339() },
-            "end": { "dateTime": end.to_rfc3339() },
+            "start": { "dateTime": to_rfc3339(start) },
+            "end": { "dateTime": to_rfc3339(end) },
         });
         if let Some(loc) = query.location.as_deref().filter(|s| !s.is_empty()) {
             payload["location"] = serde_json::Value::String(loc.to_string());
@@ -312,17 +335,38 @@ fn parse_event(v: &serde_json::Value) -> Option<CalendarEvent> {
     })
 }
 
-fn parse_time(v: &serde_json::Value) -> Option<(DateTime<Utc>, bool)> {
+fn parse_time(v: &serde_json::Value) -> Option<(Timestamp, bool)> {
     if let Some(dt) = v.get("dateTime").and_then(|s| s.as_str()) {
-        let parsed = DateTime::parse_from_rfc3339(dt).ok()?;
-        return Some((parsed.with_timezone(&Utc), false));
+        let parsed = dt.parse::<Timestamp>().ok()?;
+        return Some((parsed, false));
     }
     if let Some(d) = v.get("date").and_then(|s| s.as_str()) {
-        let date = chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok()?;
-        let naive = date.and_hms_opt(0, 0, 0)?;
-        return Some((Utc.from_utc_datetime(&naive), true));
+        let date = civil::Date::strptime("%Y-%m-%d", d).ok()?;
+        let start = date
+            .to_datetime(civil::Time::midnight())
+            .to_zoned_datetime(TimeZone::UTC)
+            .ok()?
+            .timestamp();
+        return Some((start, true));
     }
     None
+}
+
+/// RFC 3339 in UTC with a `+00:00` offset and 0, 3, 6 or 9 fractional digits,
+/// the shape the calendar API requests have always carried.
+fn to_rfc3339(ts: Timestamp) -> String {
+    let zoned = ts.to_zoned_datetime(TimeZone::UTC);
+    let nanos = zoned.subsec_nanosecond();
+    let fraction = if nanos == 0 {
+        String::new()
+    } else if nanos % 1_000_000 == 0 {
+        format!(".{:03}", nanos / 1_000_000)
+    } else if nanos % 1_000 == 0 {
+        format!(".{:06}", nanos / 1_000)
+    } else {
+        format!(".{nanos:09}")
+    };
+    format!("{}{fraction}+00:00", zoned.strftime("%Y-%m-%dT%H:%M:%S"))
 }
 
 #[async_trait]
@@ -370,7 +414,7 @@ impl CalendarSkill for GoogleCalendarSkill {
                         summary: format!(
                             "Created \"{}\" at {}",
                             event.title,
-                            event.start.format("%Y-%m-%d %H:%M UTC")
+                            event.start.strftime("%Y-%m-%d %H:%M UTC")
                         ),
                         created_event_id: Some(event.id.clone()),
                         events: vec![event],
@@ -405,6 +449,36 @@ impl CalendarSkill for GoogleCalendarSkill {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ts(s: &str) -> Timestamp {
+        s.parse().expect("timestamp")
+    }
+
+    #[test]
+    fn to_rfc3339_matches_the_long_standing_request_shape() {
+        assert_eq!(
+            to_rfc3339(ts("2026-04-18T12:00:00Z")),
+            "2026-04-18T12:00:00+00:00"
+        );
+        assert_eq!(
+            to_rfc3339(ts("2026-04-18T12:00:00.5Z")),
+            "2026-04-18T12:00:00.500+00:00"
+        );
+    }
+
+    #[test]
+    fn parse_time_reads_date_times_and_all_day_dates() {
+        let (start, all_day) =
+            parse_time(&serde_json::json!({"dateTime": "2026-04-18T14:00:00+02:00"}))
+                .expect("date time");
+        assert_eq!(start, ts("2026-04-18T12:00:00Z"));
+        assert!(!all_day);
+        let (start, all_day) =
+            parse_time(&serde_json::json!({"date": "2026-04-18"})).expect("date");
+        assert_eq!(start, ts("2026-04-18T00:00:00Z"));
+        assert!(all_day);
+        assert!(parse_time(&serde_json::json!({"date": "nope"})).is_none());
+    }
     use std::sync::Mutex;
 
     struct StubTransport {
@@ -502,14 +576,18 @@ mod tests {
             body: Some(body.to_string()),
         }]));
         let skill = GoogleCalendarSkill::new(auth(), transport.clone());
-        let start = DateTime::parse_from_rfc3339("2026-04-18T12:00:00Z")
-            .expect("rfc3339")
-            .with_timezone(&Utc);
+        let start = "2026-04-18T12:00:00Z"
+            .parse::<Timestamp>()
+            .expect("rfc3339");
         let q = CalendarQuery {
             action: CalendarAction::Create,
             title: Some("Lunch".to_string()),
             start: Some(start),
-            end: Some(start + Duration::hours(1)),
+            end: Some(
+                start
+                    .saturating_add(SignedDuration::from_hours(1))
+                    .unwrap_or(start),
+            ),
             location: Some("Cafeteria".to_string()),
             calendar_name: None,
         };

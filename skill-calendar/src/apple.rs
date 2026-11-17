@@ -9,7 +9,7 @@ use crate::types::{
     CalendarAction, CalendarError, CalendarEvent, CalendarQuery, CalendarResult, CalendarSkill,
 };
 use async_trait::async_trait;
-use chrono::{DateTime, Duration, TimeZone, Timelike, Utc};
+use jiff::{civil, tz::TimeZone, SignedDuration, Timestamp};
 use metrics::{counter, histogram};
 use std::process::Command;
 use std::time::Instant;
@@ -56,30 +56,49 @@ impl AppleCalendarSkill {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
 
-    fn day_bounds_today() -> (DateTime<Utc>, DateTime<Utc>) {
-        let now = Utc::now();
+    fn day_bounds_today() -> (Timestamp, Timestamp) {
+        let now = Timestamp::now();
         let start = now
-            .date_naive()
-            .and_hms_opt(0, 0, 0)
-            .map(|n| Utc.from_utc_datetime(&n))
+            .to_zoned_datetime(TimeZone::UTC)
+            .date()
+            .to_datetime(civil::Time::midnight())
+            .to_zoned_datetime(TimeZone::UTC)
+            .map(|z| z.timestamp())
             .unwrap_or(now);
-        (start, start + Duration::days(1))
+        (
+            start,
+            start
+                .saturating_add(SignedDuration::from_hours(24))
+                .unwrap_or(start),
+        )
     }
 
-    fn day_bounds_tomorrow() -> (DateTime<Utc>, DateTime<Utc>) {
+    fn day_bounds_tomorrow() -> (Timestamp, Timestamp) {
         let (s, _) = Self::day_bounds_today();
-        let start = s + Duration::days(1);
-        (start, start + Duration::days(1))
+        let start = s
+            .saturating_add(SignedDuration::from_hours(24))
+            .unwrap_or(s);
+        (
+            start,
+            start
+                .saturating_add(SignedDuration::from_hours(24))
+                .unwrap_or(start),
+        )
     }
 
-    fn upcoming_bounds(days: u32) -> (DateTime<Utc>, DateTime<Utc>) {
-        let start = Utc::now();
-        (start, start + Duration::days(days as i64))
+    fn upcoming_bounds(days: u32) -> (Timestamp, Timestamp) {
+        let start = Timestamp::now();
+        (
+            start,
+            start
+                .saturating_add(SignedDuration::from_hours(i64::from(days) * 24))
+                .unwrap_or(start),
+        )
     }
 
     /// AppleScript to list events as one event per line in the form
     /// `YYYY-MM-DDTHH:MM:SS|YYYY-MM-DDTHH:MM:SS|UID|TITLE|LOCATION|CALENDAR`.
-    pub(crate) fn build_list_script(start: DateTime<Utc>, end: DateTime<Utc>) -> String {
+    pub(crate) fn build_list_script(start: Timestamp, end: Timestamp) -> String {
         let s = Self::format_for_applescript(start);
         let e = Self::format_for_applescript(end);
         format!(
@@ -110,7 +129,8 @@ impl AppleCalendarSkill {
         )
     }
 
-    fn format_for_applescript(dt: DateTime<Utc>) -> String {
+    fn format_for_applescript(dt: Timestamp) -> String {
+        let dt = dt.to_zoned_datetime(TimeZone::UTC);
         format!(
             "(date \"{}/{}/{} {}:{}:{}\")",
             dt.year(),
@@ -132,7 +152,11 @@ impl AppleCalendarSkill {
         let start = query
             .start
             .ok_or_else(|| CalendarError::InvalidQuery("missing start time".to_string()))?;
-        let end = query.end.unwrap_or(start + Duration::hours(1));
+        let end = query.end.unwrap_or(
+            start
+                .saturating_add(SignedDuration::from_hours(1))
+                .unwrap_or(start),
+        );
         if end <= start {
             return Err(CalendarError::InvalidQuery(
                 "end must be after start".to_string(),
@@ -168,24 +192,6 @@ impl AppleCalendarSkill {
              return uid of newEvent\n\
              end tell"
         ))
-    }
-}
-
-trait DateTimeExt {
-    fn year(&self) -> i32;
-    fn month(&self) -> u32;
-    fn day(&self) -> u32;
-}
-
-impl DateTimeExt for DateTime<Utc> {
-    fn year(&self) -> i32 {
-        chrono::Datelike::year(self)
-    }
-    fn month(&self) -> u32 {
-        chrono::Datelike::month(self)
-    }
-    fn day(&self) -> u32 {
-        chrono::Datelike::day(self)
     }
 }
 
@@ -240,8 +246,12 @@ impl CalendarSkill for AppleCalendarSkill {
                     let script = Self::build_create_script(query)?;
                     let uid = self.run_script(&script)?;
                     let title = query.title.clone().unwrap_or_else(|| "(untitled)".into());
-                    let start = query.start.unwrap_or_else(Utc::now);
-                    let end = query.end.unwrap_or(start + Duration::hours(1));
+                    let start = query.start.unwrap_or_else(Timestamp::now);
+                    let end = query.end.unwrap_or(
+                        start
+                            .saturating_add(SignedDuration::from_hours(1))
+                            .unwrap_or(start),
+                    );
                     let event = CalendarEvent {
                         id: if uid.is_empty() {
                             "dry-run".to_string()
@@ -258,7 +268,7 @@ impl CalendarSkill for AppleCalendarSkill {
                     Ok(CalendarResult {
                         summary: format!(
                             "Created \"{title}\" at {}",
-                            start.format("%Y-%m-%d %H:%M UTC")
+                            start.strftime("%Y-%m-%d %H:%M UTC")
                         ),
                         created_event_id: Some(event.id.clone()),
                         events: vec![event],
@@ -333,7 +343,7 @@ fn parse_event_lines(raw: &str) -> Vec<CalendarEvent> {
     out
 }
 
-fn parse_apple_date(s: &str) -> Option<DateTime<Utc>> {
+fn parse_apple_date(s: &str) -> Option<Timestamp> {
     // Expected coercion (en_US locale): "Saturday, April 18, 2026 at 9:00:00 AM"
     let cleaned = s.replace(" at ", " ");
     for fmt in [
@@ -342,8 +352,13 @@ fn parse_apple_date(s: &str) -> Option<DateTime<Utc>> {
         "%Y-%m-%d %H:%M:%S",
         "%Y-%m-%dT%H:%M:%S",
     ] {
-        if let Ok(naive) = chrono::NaiveDateTime::parse_from_str(&cleaned, fmt) {
-            return Some(Utc.from_utc_datetime(&naive));
+        if let Ok(datetime) =
+            jiff::fmt::strtime::parse(fmt, &cleaned).and_then(|tm| tm.to_datetime())
+        {
+            return datetime
+                .to_zoned_datetime(TimeZone::UTC)
+                .ok()
+                .map(|z| z.timestamp());
         }
     }
     None
@@ -352,6 +367,36 @@ fn parse_apple_date(s: &str) -> Option<DateTime<Utc>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ts(s: &str) -> Timestamp {
+        s.parse().expect("timestamp")
+    }
+
+    #[test]
+    fn parse_apple_date_reads_every_supported_layout_as_utc() {
+        let expected = ts("2026-04-18T09:05:00Z");
+        for raw in [
+            "Saturday, April 18, 2026 at 9:05:00 AM",
+            "Sat Apr 18 09:05:00 2026",
+            "2026-04-18 09:05:00",
+            "2026-04-18T09:05:00",
+        ] {
+            assert_eq!(parse_apple_date(raw), Some(expected), "{raw}");
+        }
+        assert_eq!(
+            parse_apple_date("Saturday, April 18, 2026 at 9:05:00 PM"),
+            Some(ts("2026-04-18T21:05:00Z"))
+        );
+        assert_eq!(parse_apple_date("not a date"), None);
+    }
+
+    #[test]
+    fn format_for_applescript_is_unpadded_utc() {
+        assert_eq!(
+            AppleCalendarSkill::format_for_applescript(ts("2026-04-08T09:05:07Z")),
+            "(date \"2026/4/8 9:5:7\")"
+        );
+    }
 
     #[tokio::test]
     async fn list_today_returns_zero_in_dry_run() {
@@ -372,12 +417,16 @@ mod tests {
     #[tokio::test]
     async fn create_dry_run_returns_event() {
         let skill = AppleCalendarSkill::new_for_tests();
-        let start = Utc::now();
+        let start = Timestamp::now();
         let q = CalendarQuery {
             action: CalendarAction::Create,
             title: Some("Lunch".to_string()),
             start: Some(start),
-            end: Some(start + Duration::hours(1)),
+            end: Some(
+                start
+                    .saturating_add(SignedDuration::from_hours(1))
+                    .unwrap_or(start),
+            ),
             location: Some("Cafeteria".to_string()),
             calendar_name: None,
         };
@@ -393,7 +442,7 @@ mod tests {
         let q = CalendarQuery {
             action: CalendarAction::Create,
             title: None,
-            start: Some(Utc::now()),
+            start: Some(Timestamp::now()),
             end: None,
             location: None,
             calendar_name: None,
@@ -404,7 +453,7 @@ mod tests {
 
     #[test]
     fn build_create_script_includes_calendar_lookup() {
-        let start = Utc::now();
+        let start = Timestamp::now();
         let q = CalendarQuery {
             action: CalendarAction::Create,
             title: Some("Standup".to_string()),

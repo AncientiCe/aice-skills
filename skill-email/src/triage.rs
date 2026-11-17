@@ -70,7 +70,7 @@ fn format_messages_for_llm(messages: &[EmailMessage]) -> String {
     for m in messages {
         let received = m
             .received_at
-            .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
+            .map(|t| t.strftime("%Y-%m-%d %H:%M").to_string())
             .unwrap_or_else(|| "unknown".to_string());
         out.push(format!(
             "id={} | received={} | from={} | subject={} | snippet={}",

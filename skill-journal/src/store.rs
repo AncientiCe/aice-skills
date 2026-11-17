@@ -1,7 +1,7 @@
 //! SQLite-backed journal store.
 
 use crate::types::{JournalEntry, JournalError, JournalStats, Sentiment};
-use chrono::{DateTime, Utc};
+use jiff::{tz::TimeZone, Timestamp};
 use rusqlite::{params, Connection};
 use std::path::Path;
 use std::sync::Mutex;
@@ -48,7 +48,7 @@ impl SqliteJournalStore {
         text: &str,
         sentiment: Sentiment,
         tags: &[String],
-        created_at: DateTime<Utc>,
+        created_at: Timestamp,
     ) -> Result<JournalEntry, JournalError> {
         let conn = self
             .conn
@@ -57,7 +57,7 @@ impl SqliteJournalStore {
         let tag_csv = tags.join(",");
         conn.execute(
             "INSERT INTO journal_entries (created_at, text, sentiment, tags) VALUES (?, ?, ?, ?)",
-            params![created_at.to_rfc3339(), text, sentiment.as_str(), tag_csv],
+            params![to_rfc3339(created_at), text, sentiment.as_str(), tag_csv],
         )
         .map_err(|e| JournalError::Storage(e.to_string()))?;
         let id = conn.last_insert_rowid();
@@ -72,8 +72,8 @@ impl SqliteJournalStore {
 
     pub fn recall(
         &self,
-        from: Option<DateTime<Utc>>,
-        to: Option<DateTime<Utc>>,
+        from: Option<Timestamp>,
+        to: Option<Timestamp>,
         contains: Option<&str>,
         limit: usize,
     ) -> Result<Vec<JournalEntry>, JournalError> {
@@ -87,11 +87,11 @@ impl SqliteJournalStore {
         let mut args: Vec<String> = Vec::new();
         if let Some(f) = from {
             sql.push_str(" AND created_at >= ?");
-            args.push(f.to_rfc3339());
+            args.push(to_rfc3339(f));
         }
         if let Some(t) = to {
             sql.push_str(" AND created_at < ?");
-            args.push(t.to_rfc3339());
+            args.push(to_rfc3339(t));
         }
         if let Some(c) = contains {
             if !c.trim().is_empty() {
@@ -129,9 +129,9 @@ impl SqliteJournalStore {
             let tags_str: String = row
                 .get(4)
                 .map_err(|e| JournalError::Storage(e.to_string()))?;
-            let parsed_created = DateTime::parse_from_rfc3339(&created)
-                .map_err(|e| JournalError::Storage(format!("invalid created_at: {e}")))?
-                .with_timezone(&Utc);
+            let parsed_created = created
+                .parse::<Timestamp>()
+                .map_err(|e| JournalError::Storage(format!("invalid created_at: {e}")))?;
             let sentiment = Sentiment::parse(&sentiment_str).unwrap_or(Sentiment::Neutral);
             let tags = if tags_str.is_empty() {
                 Vec::new()
@@ -151,8 +151,8 @@ impl SqliteJournalStore {
 
     pub fn stats(
         &self,
-        from: Option<DateTime<Utc>>,
-        to: Option<DateTime<Utc>>,
+        from: Option<Timestamp>,
+        to: Option<Timestamp>,
     ) -> Result<JournalStats, JournalError> {
         let conn = self
             .conn
@@ -162,11 +162,11 @@ impl SqliteJournalStore {
         let mut args: Vec<String> = Vec::new();
         if let Some(f) = from {
             sql.push_str(" AND created_at >= ?");
-            args.push(f.to_rfc3339());
+            args.push(to_rfc3339(f));
         }
         if let Some(t) = to {
             sql.push_str(" AND created_at < ?");
-            args.push(t.to_rfc3339());
+            args.push(to_rfc3339(t));
         }
         sql.push_str(" GROUP BY sentiment");
         let mut stmt = conn
@@ -202,5 +202,69 @@ impl SqliteJournalStore {
             neutral: neu,
             negative: neg,
         })
+    }
+}
+
+/// RFC 3339 in UTC with a `+00:00` offset and 0, 3, 6 or 9 fractional digits.
+///
+/// This is the exact text persisted in `created_at`, so rows written before and
+/// after the move to `jiff` stay comparable as plain strings.
+fn to_rfc3339(ts: Timestamp) -> String {
+    let zoned = ts.to_zoned_datetime(TimeZone::UTC);
+    let nanos = zoned.subsec_nanosecond();
+    let fraction = if nanos == 0 {
+        String::new()
+    } else if nanos % 1_000_000 == 0 {
+        format!(".{:03}", nanos / 1_000_000)
+    } else if nanos % 1_000 == 0 {
+        format!(".{:06}", nanos / 1_000)
+    } else {
+        format!(".{nanos:09}")
+    };
+    format!("{}{fraction}+00:00", zoned.strftime("%Y-%m-%dT%H:%M:%S"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts(s: &str) -> Timestamp {
+        s.parse().expect("timestamp")
+    }
+
+    #[test]
+    fn rfc3339_uses_plus_zero_offset_without_fraction_for_whole_seconds() {
+        assert_eq!(
+            to_rfc3339(ts("2026-04-18T12:00:00Z")),
+            "2026-04-18T12:00:00+00:00"
+        );
+    }
+
+    #[test]
+    fn rfc3339_groups_fractional_digits_in_threes() {
+        assert_eq!(
+            to_rfc3339(ts("2026-04-18T12:00:00.5Z")),
+            "2026-04-18T12:00:00.500+00:00"
+        );
+        assert_eq!(
+            to_rfc3339(ts("2026-04-18T12:00:00.000123Z")),
+            "2026-04-18T12:00:00.000123+00:00"
+        );
+        assert_eq!(
+            to_rfc3339(ts("2026-04-18T12:00:00.123456789Z")),
+            "2026-04-18T12:00:00.123456789+00:00"
+        );
+    }
+
+    #[test]
+    fn stored_text_round_trips_through_the_store() {
+        let store = SqliteJournalStore::open_in_memory().expect("open");
+        let at = ts("2026-04-18T12:00:00.250Z");
+        let entry = store
+            .insert("hello", Sentiment::Neutral, &[], at)
+            .expect("insert");
+        assert_eq!(entry.created_at, at);
+        let rows = store.recall(None, None, None, 10).expect("recall");
+        assert_eq!(rows[0].created_at, at);
     }
 }

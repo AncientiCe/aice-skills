@@ -1,7 +1,7 @@
 //! Email skill types and traits shared across providers (Apple Mail, IMAP).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct EmailMessage {
@@ -9,7 +9,7 @@ pub struct EmailMessage {
     pub sender: String,
     pub subject: String,
     pub snippet: String,
-    pub received_at: Option<DateTime<Utc>>,
+    pub received_at: Option<Timestamp>,
     pub unread: bool,
     pub flagged: bool,
     pub mailbox: Option<String>,
@@ -64,7 +64,7 @@ impl EmailResult {
         for m in &self.messages {
             let when = m
                 .received_at
-                .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
+                .map(|t| t.strftime("%Y-%m-%d %H:%M").to_string())
                 .unwrap_or_else(|| "unknown time".to_string());
             let unread = if m.unread { " [unread]" } else { "" };
             out.push(format!(

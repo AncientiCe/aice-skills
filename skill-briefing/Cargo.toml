@@ -15,5 +15,5 @@ thiserror = "1.0"
 tokio = { version = "1", features = ["macros"] }
 
 [dev-dependencies]
-chrono = "0.4"
+jiff = "1"
 tokio = { version = "1", features = ["rt", "macros"] }
