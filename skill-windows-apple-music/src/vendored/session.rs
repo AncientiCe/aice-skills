@@ -10,7 +10,7 @@ use aes_gcm::{
 };
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use keyring::Entry;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -25,7 +25,7 @@ pub struct SessionSnapshot {
     pub developer_token: Option<String>,
     pub media_user_token: Option<String>,
     pub raw_cookie_header: Option<String>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<Timestamp>,
 }
 
 impl SessionSnapshot {
@@ -46,7 +46,7 @@ impl SessionSnapshot {
         if let Some(v) = capture.raw_cookie_header {
             self.raw_cookie_header = Some(v);
         }
-        self.updated_at = Some(Utc::now());
+        self.updated_at = Some(Timestamp::now());
     }
 
     pub fn clear(&mut self) {

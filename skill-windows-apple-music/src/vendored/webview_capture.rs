@@ -375,7 +375,7 @@ fn normalize_opt(value: String) -> Option<String> {
 
 fn trace_output_path() -> Result<PathBuf> {
     let base_dir = dirs::data_local_dir().context("failed to find local data directory")?;
-    let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let ts = jiff::Timestamp::now().strftime("%Y%m%d_%H%M%S");
     Ok(base_dir
         .join("apple_music_player")
         .join("traces")

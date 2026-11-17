@@ -2,7 +2,7 @@
 
 use crate::types::{ReminderResult, ReminderSkill, ReminderSkillError};
 use async_trait::async_trait;
-use chrono::{Datelike, NaiveDateTime, Timelike};
+use jiff::civil::{Date, DateTime, Time};
 use metrics::{counter, histogram};
 use std::process::Command;
 use std::time::Instant;
@@ -31,24 +31,24 @@ impl MacOsReminderSkill {
     }
 
     /// Parse an ISO 8601 date-time string (e.g. "2026-03-20T17:00" or "2026-03-20 17:00").
-    fn parse_iso_datetime(when: &str) -> Option<NaiveDateTime> {
+    fn parse_iso_datetime(when: &str) -> Option<DateTime> {
         let normalized = when.trim().replace('T', " ");
         // Try full datetime
-        if let Ok(dt) = NaiveDateTime::parse_from_str(&normalized, "%Y-%m-%d %H:%M:%S") {
+        if let Ok(dt) = DateTime::strptime("%Y-%m-%d %H:%M:%S", &normalized) {
             return Some(dt);
         }
-        if let Ok(dt) = NaiveDateTime::parse_from_str(&normalized, "%Y-%m-%d %H:%M") {
+        if let Ok(dt) = DateTime::strptime("%Y-%m-%d %H:%M", &normalized) {
             return Some(dt);
         }
         // Try date-only → midnight
-        if let Ok(d) = chrono::NaiveDate::parse_from_str(normalized.trim(), "%Y-%m-%d") {
-            return d.and_hms_opt(0, 0, 0);
+        if let Ok(d) = Date::strptime("%Y-%m-%d", normalized.trim()) {
+            return Some(d.to_datetime(Time::midnight()));
         }
         None
     }
 
     /// Build the AppleScript to create a reminder, optionally with a due date.
-    fn build_create_script(title: &str, dt: Option<NaiveDateTime>) -> String {
+    fn build_create_script(title: &str, dt: Option<DateTime>) -> String {
         let escaped_title = Self::escape_applescript_string(title);
         match dt {
             None => format!(
@@ -131,7 +131,7 @@ impl MacOsReminderSkill {
             self.run_script(&script)?;
         }
 
-        let when_display = dt.map(|d| d.format("%d %b %Y at %H:%M").to_string());
+        let when_display = dt.map(|d| d.strftime("%d %b %Y at %H:%M").to_string());
         let summary = match &when_display {
             Some(w) => format!("Reminder '{}' created for {}", title, w),
             None => format!("Reminder '{}' created without due date", title),
@@ -208,7 +208,7 @@ mod tests {
         }
     }
     use super::MacOsReminderSkill;
-    use chrono::{NaiveDateTime, Timelike};
+    use jiff::civil::DateTime;
 
     #[test]
     fn escape_applescript_string_escapes_quotes_and_backslashes() {
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn build_create_script_with_date_includes_date_components() {
-        let dt = NaiveDateTime::parse_from_str("2026-03-20 17:00", "%Y-%m-%d %H:%M").must();
+        let dt = DateTime::strptime("%Y-%m-%d %H:%M", "2026-03-20 17:00").must();
         let script = MacOsReminderSkill::build_create_script("Buy milk", Some(dt));
         assert!(script.contains("Buy milk"));
         assert!(script.contains("due date"));
