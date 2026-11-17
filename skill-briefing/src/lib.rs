@@ -161,7 +161,7 @@ impl ComposedBriefingSkill {
     }
 
     fn default_greeting() -> String {
-        let hour = chrono_hour();
+        let hour = utc_hour();
         match hour {
             Some(h) if h < 12 => "Good morning.".to_string(),
             Some(h) if h < 18 => "Good afternoon.".to_string(),
@@ -177,7 +177,7 @@ impl Default for ComposedBriefingSkill {
     }
 }
 
-fn chrono_hour() -> Option<u32> {
+fn utc_hour() -> Option<u32> {
     use std::time::SystemTime;
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -333,8 +333,8 @@ mod tests {
             events: vec![CalendarEvent {
                 id: "ev1".into(),
                 title: "Standup".into(),
-                start: chrono::Utc::now(),
-                end: chrono::Utc::now(),
+                start: jiff::Timestamp::now(),
+                end: jiff::Timestamp::now(),
                 all_day: false,
                 location: None,
                 calendar_name: None,

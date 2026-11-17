@@ -2,14 +2,14 @@
 //! Google Calendar, ...).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CalendarEvent {
     pub id: String,
     pub title: String,
-    pub start: DateTime<Utc>,
-    pub end: DateTime<Utc>,
+    pub start: Timestamp,
+    pub end: Timestamp,
     pub all_day: bool,
     pub location: Option<String>,
     pub calendar_name: Option<String>,
@@ -17,7 +17,7 @@ pub struct CalendarEvent {
 
 impl CalendarEvent {
     pub fn duration_minutes(&self) -> i64 {
-        (self.end - self.start).num_minutes()
+        (self.end - self.start).as_mins()
     }
 }
 
@@ -47,8 +47,8 @@ impl CalendarAction {
 pub struct CalendarQuery {
     pub action: CalendarAction,
     pub title: Option<String>,
-    pub start: Option<DateTime<Utc>>,
-    pub end: Option<DateTime<Utc>>,
+    pub start: Option<Timestamp>,
+    pub end: Option<Timestamp>,
     pub location: Option<String>,
     pub calendar_name: Option<String>,
 }
@@ -69,12 +69,12 @@ impl CalendarResult {
         lines.push(self.summary.clone());
         for ev in &self.events {
             let when = if ev.all_day {
-                ev.start.format("%Y-%m-%d (all day)").to_string()
+                ev.start.strftime("%Y-%m-%d (all day)").to_string()
             } else {
                 format!(
                     "{} - {}",
-                    ev.start.format("%Y-%m-%d %H:%M"),
-                    ev.end.format("%H:%M")
+                    ev.start.strftime("%Y-%m-%d %H:%M"),
+                    ev.end.strftime("%H:%M")
                 )
             };
             let loc = ev

@@ -17,7 +17,7 @@ pub use types::{
 };
 
 use async_trait::async_trait;
-use chrono::Utc;
+use jiff::Timestamp;
 use metrics::{counter, histogram};
 use std::sync::Arc;
 use std::time::Instant;
@@ -59,7 +59,7 @@ impl JournalSkill for LocalJournalSkill {
                     Err(JournalError::InvalidQuery("empty entry text".to_string()))
                 } else {
                     let s = sentiment.unwrap_or_else(|| sentiment::classify(trimmed));
-                    let entry = self.store.insert(trimmed, s, tags, Utc::now())?;
+                    let entry = self.store.insert(trimmed, s, tags, Timestamp::now())?;
                     Ok(JournalResult::Added(entry))
                 }
             }

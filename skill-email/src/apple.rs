@@ -5,7 +5,7 @@ use crate::types::{
     EmailAction, EmailError, EmailLlm, EmailMessage, EmailQuery, EmailResult, EmailSkill,
 };
 use async_trait::async_trait;
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use jiff::{tz::TimeZone, Timestamp};
 use metrics::{counter, histogram};
 use std::process::Command;
 use std::sync::Arc;
@@ -290,7 +290,7 @@ fn snippet(raw: &str) -> String {
     }
 }
 
-fn parse_apple_date(s: &str) -> Option<DateTime<Utc>> {
+fn parse_apple_date(s: &str) -> Option<Timestamp> {
     let cleaned = s.replace(" at ", " ");
     for fmt in [
         "%A, %B %d, %Y %I:%M:%S %p",
@@ -298,8 +298,13 @@ fn parse_apple_date(s: &str) -> Option<DateTime<Utc>> {
         "%Y-%m-%d %H:%M:%S",
         "%Y-%m-%dT%H:%M:%S",
     ] {
-        if let Ok(naive) = NaiveDateTime::parse_from_str(&cleaned, fmt) {
-            return Some(Utc.from_utc_datetime(&naive));
+        if let Ok(datetime) =
+            jiff::fmt::strtime::parse(fmt, &cleaned).and_then(|tm| tm.to_datetime())
+        {
+            return datetime
+                .to_zoned_datetime(TimeZone::UTC)
+                .ok()
+                .map(|z| z.timestamp());
         }
     }
     None
@@ -308,6 +313,28 @@ fn parse_apple_date(s: &str) -> Option<DateTime<Utc>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ts(s: &str) -> Timestamp {
+        s.parse().expect("timestamp")
+    }
+
+    #[test]
+    fn parse_apple_date_reads_every_supported_layout_as_utc() {
+        let expected = ts("2026-04-18T09:05:00Z");
+        for raw in [
+            "Saturday, April 18, 2026 at 9:05:00 AM",
+            "Sat Apr 18 09:05:00 2026",
+            "2026-04-18 09:05:00",
+            "2026-04-18T09:05:00",
+        ] {
+            assert_eq!(parse_apple_date(raw), Some(expected), "{raw}");
+        }
+        assert_eq!(
+            parse_apple_date("Saturday, April 18, 2026 at 9:05:00 PM"),
+            Some(ts("2026-04-18T21:05:00Z"))
+        );
+        assert_eq!(parse_apple_date("not a date"), None);
+    }
 
     #[tokio::test]
     async fn dry_run_unread_returns_zero() {

@@ -1,7 +1,7 @@
 //! Journal skill types and traits.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Sentiment {
@@ -32,7 +32,7 @@ impl Sentiment {
 #[derive(Clone, Debug, PartialEq)]
 pub struct JournalEntry {
     pub id: i64,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
     pub text: String,
     pub sentiment: Sentiment,
     pub tags: Vec<String>,
@@ -46,14 +46,14 @@ pub enum JournalAction {
         tags: Vec<String>,
     },
     Recall {
-        from: Option<DateTime<Utc>>,
-        to: Option<DateTime<Utc>>,
+        from: Option<Timestamp>,
+        to: Option<Timestamp>,
         contains: Option<String>,
         limit: usize,
     },
     Stats {
-        from: Option<DateTime<Utc>>,
-        to: Option<DateTime<Utc>>,
+        from: Option<Timestamp>,
+        to: Option<Timestamp>,
     },
 }
 
@@ -77,7 +77,7 @@ impl JournalResult {
         match self {
             Self::Added(e) => format!(
                 "Journal entry saved at {} ({}): {}",
-                e.created_at.format("%Y-%m-%d %H:%M UTC"),
+                e.created_at.strftime("%Y-%m-%d %H:%M UTC"),
                 e.sentiment.as_str(),
                 e.text
             ),
@@ -89,7 +89,7 @@ impl JournalResult {
                 for e in entries {
                     out.push(format!(
                         "- [{}] {} ({}): {}",
-                        e.created_at.format("%Y-%m-%d %H:%M"),
+                        e.created_at.strftime("%Y-%m-%d %H:%M"),
                         e.sentiment.as_str(),
                         if e.tags.is_empty() {
                             "no tags".to_string()
