@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-use chrono::NaiveDate;
+use jiff::civil::Date;
 use std::time::SystemTime;
 
 #[derive(Clone, Debug)]
 pub struct HolidayQuery {
     pub holiday_name: Option<String>,
-    pub date: Option<NaiveDate>,
+    pub date: Option<Date>,
     pub country_code: String,
     pub region_code: Option<String>,
     pub year: Option<i32>,
@@ -14,10 +14,10 @@ pub struct HolidayQuery {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HolidayMatch {
     pub name: String,
-    pub date: NaiveDate,
+    pub date: Date,
     pub is_public_holiday: bool,
     pub local_name: Option<String>,
-    pub observed_date: Option<NaiveDate>,
+    pub observed_date: Option<Date>,
 }
 
 #[derive(Clone, Debug)]
@@ -37,7 +37,7 @@ impl HolidayLookupResult {
         let summary = self
             .matches
             .iter()
-            .map(|entry| format!("{} on {}", entry.name, entry.date.format("%Y-%m-%d")))
+            .map(|entry| format!("{} on {}", entry.name, entry.date.strftime("%Y-%m-%d")))
             .collect::<Vec<_>>()
             .join("; ");
 

@@ -39,7 +39,7 @@ impl HttpSportsLiveSkill {
             query.query.trim().to_lowercase(),
             query
                 .date
-                .map(|date| date.format("%Y-%m-%d").to_string())
+                .map(|date| date.strftime("%Y-%m-%d").to_string())
                 .unwrap_or_default()
         )
     }

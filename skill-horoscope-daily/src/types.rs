@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-use chrono::NaiveDate;
+use jiff::civil::Date;
 use std::time::SystemTime;
 
 #[derive(Clone, Debug)]
 pub struct HoroscopeDailyQuery {
     pub sign: String,
-    pub date: Option<NaiveDate>,
+    pub date: Option<Date>,
 }
 
 #[derive(Clone, Debug)]
